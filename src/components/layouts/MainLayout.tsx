@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
-import "../../css/Mainlayout/Mainlayout.css";
+import "../../css/MainLayout/MainLayout.css";
 
 interface MainLayoutProps {
   children: ReactNode;
