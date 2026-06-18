@@ -1,0 +1,121 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+}
+
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Paleta azul neutro */
+  --primario: #2563EB;
+  --primario-hover: #1D4ED8;
+  --primario-claro: #60a1f5;
+  --fondo: #0c1322;
+  --fondo-card: #18243f;
+  --texto: #ffffff;
+  --texto-secundario: #94a3b8;
+  --texto-muted: #64748b;
+  --borde: rgba(255, 255, 255, 0.08);
+
+  background: var(--fondo);
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+body::selection {
+  background: var(--primario);
+  color: var(--texto);
+}
+
+a,
+button {
+  transition: all 0.25s ease;
+}
+
+button,
+a {
+  cursor: pointer;
+}
+
+button {
+  font: inherit;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    flex-direction: column;
+  }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 80%;
+    max-width: 340px;
+    transform: translateX(-100%);
+    transition: transform 0.32s ease;
+    z-index: 40;
+    height: 100vh;
+    border-radius: 0 22px 22px 0;
+    margin: 0;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar-mobile-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 30;
+  }
+  .content-area {
+    width: 100%;
+  }
+  .navbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    position: sticky;
+    top: 0;
+    background: rgba(12, 19, 34, 0.96);
+    backdrop-filter: blur(18px);
+    z-index: 20;
+  }
+  .main-content {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .sidebar {
+    width: 92%;
+  }
+  .sidebar-menu a {
+    padding: 10px 12px;
+  }
+}

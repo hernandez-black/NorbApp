@@ -1,0 +1,33 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--fondo) 0%, #0c2c5d 100%);
+}
+
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.main-content {
+  padding: 2.2rem;
+  background: linear-gradient(135deg, var(--fondo-card) 0%, #0c2c5d 100%);
+  border-radius: 28px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.25);
+  min-height: calc(100vh - 130px);
+  color: var(--texto);
+}
+
+@media (max-width: 900px) {
+  .layout {
+    padding: 1rem;
+  }
+  .main-content {
+    min-height: auto;
+    padding: 1.5rem;
+  }
+}
