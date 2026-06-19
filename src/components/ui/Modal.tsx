@@ -11,6 +11,13 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
+const sizeWidths: Record<string, string> = {
+  sm: '480px',
+  md: '560px',
+  lg: '720px',
+  xl: '960px',
+};
+
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -28,29 +35,64 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
 
   if (!isOpen) return null;
 
-  const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className={`bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col`}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: 'var(--fondo-card, #1e1e1e)',
+          color: 'var(--texto, #fff)',
+          borderRadius: '12px',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+          width: '100%',
+          maxWidth: sizeWidths[size],
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          {title && <h3 className="text-lg font-semibold text-gray-900">{title}</h3>}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 24px',
+            borderBottom: '1px solid var(--borde, #333)',
+          }}
+        >
+          {title && <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>{title}</h3>}
           <button
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-gray-100 transition-colors ml-auto"
+            style={{
+              marginLeft: 'auto',
+              padding: '4px',
+              borderRadius: '50%',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+            }}
           >
-            <FaTimes className="text-gray-500" />
+            <FaTimes />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
           {children}
         </div>
       </div>

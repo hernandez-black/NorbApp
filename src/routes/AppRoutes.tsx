@@ -14,6 +14,7 @@ import NuevaOrden from "../pages/Orden/NuevaOrden";
 import Clientes from "../pages/Clientes";
 import Vehiculos from "../pages/Vehiculos";
 import Administracion from "../pages/Administrador";
+import Mecanicos from "../pages/Mecanicos";
 
 const isAuthenticated = () => !!localStorage.getItem("rol");
 const getRole = () => localStorage.getItem("rol");
@@ -61,6 +62,15 @@ export default function AppRoutes() {
           <Route path="/administracion" element={
             <RutaProtegida><SoloAdmin><MainLayout><Administracion /></MainLayout></SoloAdmin></RutaProtegida>
           } />
+
+          <Route path="/mecanicos" element={
+  <RutaProtegida>
+    <SoloAdmin>
+      <MainLayout><Mecanicos /></MainLayout>
+    </SoloAdmin>
+  </RutaProtegida>
+} />
+
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

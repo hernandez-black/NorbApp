@@ -370,3 +370,53 @@
   font-size: 0.78rem;
   color: var(--texto-muted);
 }
+
+
+/* Botones */
+.btn-primary {
+  background: var(--primario);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: 0.2s;
+  cursor: pointer;
+}
+.btn-primary:hover { background: var(--primario-hover); }
+
+.btn-secondary {
+  background: var(--fondo-card);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: 0.2s;
+  cursor: pointer;
+}
+.btn-secondary:hover { background: var(--borde); }
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: 0.2s;
+  cursor: pointer;
+}
+.btn-danger:hover { background: #b91c1c; }
+
+.btn-success {
+  background: #16a34a;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: 0.2s;
+  cursor: pointer;
+}
+.btn-success:hover { background: #15803d; }

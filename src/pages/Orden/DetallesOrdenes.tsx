@@ -3,13 +3,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   FaArrowLeft, FaCar, FaStethoscope, FaFileInvoiceDollar,
   FaWrench, FaClipboardList, FaCheckCircle, FaHandshake,
-  FaCamera, FaTools, FaPlus, FaTrash, FaEdit, FaSave, FaTimes
+  FaCamera, FaTools, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaFileUpload
 } from "react-icons/fa";
 import { useOrdenes } from '../../context/useOrdenes';
-import { useToast } from '../../context/useToast'; // Ruta correcta para el hook
-import type { EstadoOrden, ObjetoInventario, Usuario, ItemCotizacion, Refaccion, BitacoraItem, Cotizacion, FormaPago, Diagnostico, Rol, Evidencia, Checklist } from "../../types";
-import UploadFoto from "../../components/ui/UpdloadFoto"; // Nombre corregido
+import { useToast } from '../../context/useToast';
+import type { EstadoOrden, ObjetoInventario, Usuario, ItemCotizacion, Refaccion, BitacoraItem, Cotizacion, FormaPago, Diagnostico, Rol, Evidencia, Checklist, EstadoRefaccion } from "../../types";
+import UploadFoto from "../../components/ui/UpdloadFoto";
 import FirmaDigital from "../../components/ui/FirmaDigital";
+import Modal from "../../components/ui/Modal";
 import "../../css/Orden/DetalleOrdenes.css";
 
 // ── Tabs disponibles ──────────────────────────────────────
@@ -92,23 +93,23 @@ function ObjetosEditor({ objetos, onUpdate, ordenId }: { objetos: ObjetoInventar
                   onChange={e => setEditCant(Number(e.target.value))}
                   style={{ width: "70px", marginLeft: "8px" }}
                 />
-                <button onClick={saveEdit} className="obj-btn"><FaSave /></button>
-                <button onClick={cancelEdit} className="obj-btn"><FaTimes /></button>
+                <button onClick={saveEdit} className="btn-icon btn-success"><FaSave /></button>
+                <button onClick={cancelEdit} className="btn-icon btn-danger"><FaTimes /></button>
               </>
             ) : (
               <>
                 <FaCheckCircle className="obj-icon" />
                 <span>{obj.descripcion} (x{obj.cantidad})</span>
                 <div className="obj-actions">
-                  <button onClick={() => startEdit(obj)} className="obj-btn"><FaEdit /></button>
-                  <button onClick={() => handleDelete(obj.id)} className="obj-btn"><FaTrash /></button>
+                  <button onClick={() => startEdit(obj)} className="btn-icon btn-edit"><FaEdit /></button>
+                  <button onClick={() => handleDelete(obj.id)} className="btn-icon btn-danger"><FaTrash /></button>
                 </div>
               </>
             )}
           </li>
         ))}
       </ul>
-      <button onClick={handleAdd} className="btn-subir-foto" style={{ marginTop: "8px" }}>
+      <button onClick={handleAdd} className="btn-primary btn-sm" style={{ marginTop: "8px" }}>
         <FaPlus /> Agregar objeto
       </button>
     </div>
@@ -150,7 +151,7 @@ function ItemCotizacionEditor({ items, onUpdate }: { items: ItemCotizacion[]; on
 
   return (
     <div>
-      <table className="cotizacion-table">
+      <table className="cotizacion-table refacciones-table">
         <thead>
           <tr><th>Concepto</th><th>Cant.</th><th>Costo Unit.</th><th>Total</th><th></th></tr>
         </thead>
@@ -161,12 +162,12 @@ function ItemCotizacionEditor({ items, onUpdate }: { items: ItemCotizacion[]; on
               <td><input type="number" min={1} value={item.cantidad} onChange={e => updateItem(item.id, 'cantidad', Number(e.target.value))} style={{ width: "70px" }} /></td>
               <td><input type="number" min={0} value={item.costo_unitario} onChange={e => updateItem(item.id, 'costo_unitario', Number(e.target.value))} style={{ width: "100px" }} /></td>
               <td className="mono text-right">${item.total.toLocaleString("es-MX")}</td>
-              <td><button onClick={() => deleteItem(item.id)} className="btn-icon btn-eliminar"><FaTrash /></button></td>
+              <td><button onClick={() => deleteItem(item.id)} className="btn-icon btn-danger"><FaTrash /></button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button onClick={handleAdd} className="btn-accion" style={{ marginTop: "8px" }}><FaPlus /> Agregar ítem</button>
+      <button onClick={handleAdd} className="btn-primary btn-sm" style={{ marginTop: "8px" }}><FaPlus /> Agregar ítem</button>
     </div>
   );
 }
@@ -178,12 +179,12 @@ const estadoConfig: Record<EstadoOrden, { clase: string; label: string }> = {
   "Terminado":     { clase: "badge-terminado",     label: "Terminado" },
 };
 
-const refEstadoConfig: Record<string, string> = {
-  "Solicitada": "ref-solicitada",
-  "En camino":  "ref-encamino",
-  "Recibida":   "ref-recibida",
-  "Instalada":  "ref-instalada",
-};
+// const refEstadoConfig: Record<string, string> = {
+//   "Solicitada": "ref-solicitada",
+//   "En camino":  "ref-encamino",
+//   "Recibida":   "ref-recibida",
+//   "Instalada":  "ref-instalada",
+// };
 
 export default function DetalleOrden() {
   const navigate = useNavigate();
@@ -193,7 +194,6 @@ export default function DetalleOrden() {
   const [tabActivo, setTabActivo] = useState("recepcion");
   const rol = localStorage.getItem("rol");
 
-  // ✅ Ahora orden tiene las propiedades directamente desde el tipo
   const orden = ordenes.find(o => o.id === id);
   const [costoDiagnostico, setCostoDiagnostico] = useState<number>(orden?.diagnostico?.costo_diagnostico || 0);
   const [responsableRecepcion, setResponsableRecepcion] = useState(orden?.responsable_recepcion || "");
@@ -201,7 +201,7 @@ export default function DetalleOrden() {
 
   // ── Estados para firma digital ──
   const [mostrarFirma, setMostrarFirma] = useState(false);
-  const [firmaBase64, setFirmaBase64] = useState<string | undefined>(orden?.firma_Cliente); // ✅ Mayúscula
+  const [firmaBase64, setFirmaBase64] = useState<string | undefined>(orden?.firma_Cliente);
 
   // ── Estados para fotos por etapa ──
   const [fotosRecepcion, setFotosRecepcion] = useState<string[]>(
@@ -217,11 +217,25 @@ export default function DetalleOrden() {
     orden?.evidencias?.filter(e => e.tipo === 'Entrega').map(e => e.url_foto) || []
   );
 
+  // ── Estados para modal de foto en grande ──
+  const [fotoSeleccionada, setFotoSeleccionada] = useState<string | null>(null);
+
+  // ── Estados para agregar refacción ──
+  const [mostrarModalRefaccion, setMostrarModalRefaccion] = useState(false);
+  const [nuevaRefaccion, setNuevaRefaccion] = useState<Partial<Refaccion>>({
+    nombre: '',
+    proveedor: '',
+    cantidad: 1,
+    costo: 0,
+    estado: 'Solicitada',
+    fecha_solicitud: new Date().toLocaleDateString('es-MX'),
+  });
+
   useEffect(() => {
     if (initialLoadRef.current && orden) {
       setCostoDiagnostico(orden.diagnostico?.costo_diagnostico || 0);
       setResponsableRecepcion(orden.responsable_recepcion || "");
-      setFirmaBase64(orden.firma_Cliente); // ✅ Mayúscula
+      setFirmaBase64(orden.firma_Cliente);
       setFotosRecepcion(orden.evidencias?.filter(e => e.tipo === 'Recepción').map(e => e.url_foto) || []);
       setFotosDiagnostico(orden.evidencias?.filter(e => e.tipo === 'Diagnóstico').map(e => e.url_foto) || []);
       setFotosReparacion(orden.evidencias?.filter(e => e.tipo === 'Reparación').map(e => e.url_foto) || []);
@@ -440,6 +454,64 @@ export default function DetalleOrden() {
     showToast(`Foto ${tipo === 'recibida' ? 'recibida' : 'instalada'} subida`, "success");
   };
 
+  // ── Eliminar foto de refacción ──
+  const handleEliminarFotoRefaccion = (refaccionId: string, tipo: 'recibida' | 'instalada') => {
+    const campo = tipo === 'recibida' ? 'foto_recibida' : 'foto_instalada';
+    const refaccionesActualizadas = orden.refacciones?.map(r => {
+      if (r.id === refaccionId) {
+        return { ...r, [campo]: undefined };
+      }
+      return r;
+    }) || [];
+    updateOrden(orden.id, { refacciones: refaccionesActualizadas });
+    showToast(`Foto ${tipo === 'recibida' ? 'recibida' : 'instalada'} eliminada`, "info");
+  };
+
+  // ── Cambiar estado de refacción ──
+  const handleCambiarEstadoRefaccion = (refaccionId: string, nuevoEstado: EstadoRefaccion) => {
+    const refaccionesActualizadas = orden.refacciones?.map(r => {
+      if (r.id === refaccionId) {
+        return { ...r, estado: nuevoEstado };
+      }
+      return r;
+    }) || [];
+    updateOrden(orden.id, { refacciones: refaccionesActualizadas });
+    showToast(`Estado de refacción actualizado a ${nuevoEstado}`, "success");
+  };
+
+  // ── Agregar refacción ──
+  const handleAgregarRefaccion = () => {
+    if (!nuevaRefaccion.nombre?.trim() || !nuevaRefaccion.proveedor?.trim()) {
+      showToast("Nombre y proveedor son obligatorios", "error");
+      return;
+    }
+
+    const refaccion: Refaccion = {
+      id: Date.now().toString(),
+      orden_id: orden.id,
+      nombre: nuevaRefaccion.nombre,
+      proveedor: nuevaRefaccion.proveedor,
+      cantidad: nuevaRefaccion.cantidad || 1,
+      costo: nuevaRefaccion.costo || 0,
+      estado: nuevaRefaccion.estado as EstadoRefaccion || 'Solicitada',
+      fecha_solicitud: nuevaRefaccion.fecha_solicitud || new Date().toLocaleDateString('es-MX'),
+      fecha_estimada: nuevaRefaccion.fecha_estimada,
+    };
+
+    const refaccionesActualizadas = [...(orden.refacciones || []), refaccion];
+    updateOrden(orden.id, { refacciones: refaccionesActualizadas });
+    setMostrarModalRefaccion(false);
+    setNuevaRefaccion({
+      nombre: '',
+      proveedor: '',
+      cantidad: 1,
+      costo: 0,
+      estado: 'Solicitada',
+      fecha_solicitud: new Date().toLocaleDateString('es-MX'),
+    });
+    showToast("Refacción agregada", "success");
+  };
+
   // ── Manejador de fotos por etapa (RF-24) ──────────────────
   const handleSubirFotoEtapa = (tipo: 'Recepción' | 'Diagnóstico' | 'Reparación' | 'Entrega', _file: File, preview: string) => {
     const nuevaEvidencia: Evidencia = {
@@ -453,13 +525,26 @@ export default function DetalleOrden() {
     const evidenciasActuales = orden.evidencias || [];
     updateOrden(orden.id, { evidencias: [...evidenciasActuales, nuevaEvidencia] });
 
-    // Actualizar estados locales
     if (tipo === 'Recepción') setFotosRecepcion(prev => [...prev, preview]);
     if (tipo === 'Diagnóstico') setFotosDiagnostico(prev => [...prev, preview]);
     if (tipo === 'Reparación') setFotosReparacion(prev => [...prev, preview]);
     if (tipo === 'Entrega') setFotosEntrega(prev => [...prev, preview]);
 
     showToast(`Foto de ${tipo} agregada`, "success");
+  };
+
+  // ── Eliminar foto por etapa ──
+  const handleEliminarFotoEtapa = (tipo: 'Recepción' | 'Diagnóstico' | 'Reparación' | 'Entrega', url: string) => {
+    const evidenciasActuales = orden.evidencias || [];
+    const nuevasEvidencias = evidenciasActuales.filter(e => !(e.tipo === tipo && e.url_foto === url));
+    updateOrden(orden.id, { evidencias: nuevasEvidencias });
+
+    if (tipo === 'Recepción') setFotosRecepcion(prev => prev.filter(f => f !== url));
+    if (tipo === 'Diagnóstico') setFotosDiagnostico(prev => prev.filter(f => f !== url));
+    if (tipo === 'Reparación') setFotosReparacion(prev => prev.filter(f => f !== url));
+    if (tipo === 'Entrega') setFotosEntrega(prev => prev.filter(f => f !== url));
+
+    showToast(`Foto de ${tipo} eliminada`, "info");
   };
 
   // ── Validación de evidencias (RF-25) ──────────────────────
@@ -576,7 +661,7 @@ export default function DetalleOrden() {
                   <select
                     value={responsableRecepcion}
                     onChange={(e) => handleUpdateResponsable(e.target.value)}
-                    style={{ background: "var(--fondo)", color: "var(--texto)", border: "1px solid var(--borde)", borderRadius: "6px", padding: "4px 8px" }}
+                    className="form-select"
                   >
                     <option value="">Seleccionar responsable</option>
                     {usuariosMock.map(u => (
@@ -594,19 +679,34 @@ export default function DetalleOrden() {
               <h3 className="panel-card-title"><FaCamera /> Fotografías de Recepción</h3>
               <div className="flex flex-wrap gap-2">
                 {fotosRecepcion.map((url, idx) => (
-                  <img key={idx} src={url} alt={`Recepción ${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
+                  <div key={idx} className="foto-wrapper">
+                    <img
+                      src={url}
+                      alt={`Recepción ${idx+1}`}
+                      className="foto-thumbnail"
+                      onClick={() => setFotoSeleccionada(url)}
+                    />
+                    <button
+                      className="btn-eliminar-foto"
+                      onClick={() => handleEliminarFotoEtapa('Recepción', url)}
+                      title="Eliminar foto"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
               <UploadFoto
                 onUpload={(file, preview) => handleSubirFotoEtapa('Recepción', file, preview)}
                 label="Agregar foto"
                 className="mt-2"
+                buttonClassName="btn-success btn-sm"
               />
             </div>
           </div>
         )}
 
-        {/* TAB 2: DIAGNÓSTICO (con fotos) */}
+        {/* TAB 2: DIAGNÓSTICO (con fotos) - CORREGIDO: usa fotosDiagnostico */}
         {tabActivo === "diagnostico" && (
           <div className="tab-panel">
             <div className="panel-grid-2">
@@ -616,7 +716,7 @@ export default function DetalleOrden() {
                   value={orden.diagnostico?.que_hace || ""}
                   onChange={(e) => handleDiagnosticoChange('que_hace', e.target.value)}
                   rows={2}
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--borde)", background: "var(--fondo)", color: "var(--texto)" }}
+                  className="form-textarea"
                 />
               </div>
               <div className="panel-card">
@@ -625,7 +725,7 @@ export default function DetalleOrden() {
                   value={orden.diagnostico?.como_lo_hace || ""}
                   onChange={(e) => handleDiagnosticoChange('como_lo_hace', e.target.value)}
                   rows={2}
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--borde)", background: "var(--fondo)", color: "var(--texto)" }}
+                  className="form-textarea"
                 />
               </div>
               <div className="panel-card">
@@ -634,7 +734,7 @@ export default function DetalleOrden() {
                   value={orden.diagnostico?.cuando_lo_hace || ""}
                   onChange={(e) => handleDiagnosticoChange('cuando_lo_hace', e.target.value)}
                   rows={2}
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--borde)", background: "var(--fondo)", color: "var(--texto)" }}
+                  className="form-textarea"
                 />
               </div>
               <div className="panel-card">
@@ -643,20 +743,20 @@ export default function DetalleOrden() {
                   value={orden.diagnostico?.desde_cuando || ""}
                   onChange={(e) => handleDiagnosticoChange('desde_cuando', e.target.value)}
                   rows={2}
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--borde)", background: "var(--fondo)", color: "var(--texto)" }}
+                  className="form-textarea"
                 />
               </div>
               <div className="panel-card">
                 <h3 className="panel-card-title">¿Cambios previos?</h3>
-                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div className="flex gap-4 items-center">
+                  <label className="flex items-center gap-2">
                     <input
                       type="radio"
                       checked={!orden.diagnostico?.cambios_previos}
                       onChange={() => handleDiagnosticoChange('cambios_previos', false)}
                     /> No
                   </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <label className="flex items-center gap-2">
                     <input
                       type="radio"
                       checked={!!orden.diagnostico?.cambios_previos}
@@ -670,7 +770,7 @@ export default function DetalleOrden() {
                     onChange={(e) => handleDiagnosticoChange('desc_cambios', e.target.value)}
                     placeholder="Describe los cambios previos..."
                     rows={2}
-                    style={{ width: "100%", padding: "8px", marginTop: "8px", borderRadius: "6px", border: "1px solid var(--borde)", background: "var(--fondo)", color: "var(--texto)" }}
+                    className="form-textarea mt-2"
                   />
                 )}
               </div>
@@ -682,7 +782,7 @@ export default function DetalleOrden() {
                   step={100}
                   value={costoDiagnostico}
                   onChange={(e) => handleUpdateCostoDiagnostico(Number(e.target.value))}
-                  style={{ padding: "8px", borderRadius: "8px", border: "1px solid var(--borde)", background: "var(--fondo)", color: "var(--texto)", width: "100%" }}
+                  className="form-input"
                 />
               </div>
             </div>
@@ -690,13 +790,28 @@ export default function DetalleOrden() {
               <h3 className="panel-card-title"><FaCamera /> Fotografías de Diagnóstico</h3>
               <div className="flex flex-wrap gap-2">
                 {fotosDiagnostico.map((url, idx) => (
-                  <img key={idx} src={url} alt={`Diagnóstico ${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
+                  <div key={idx} className="foto-wrapper">
+                    <img
+                      src={url}
+                      alt={`Diagnóstico ${idx+1}`}
+                      className="foto-thumbnail"
+                      onClick={() => setFotoSeleccionada(url)}
+                    />
+                    <button
+                      className="btn-eliminar-foto"
+                      onClick={() => handleEliminarFotoEtapa('Diagnóstico', url)}
+                      title="Eliminar foto"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
               <UploadFoto
                 onUpload={(file, preview) => handleSubirFotoEtapa('Diagnóstico', file, preview)}
                 label="Agregar foto"
                 className="mt-2"
+                buttonClassName="btn-success btn-sm"
               />
             </div>
           </div>
@@ -712,20 +827,20 @@ export default function DetalleOrden() {
                   <p className="text-muted-sm">Edita los conceptos y la mano de obra</p>
                 </div>
                 {rol === "admin" && (
-                  <button className="btn-accion" onClick={guardarCotizacion}>Guardar cotización</button>
+                  <button className="btn-primary" onClick={guardarCotizacion}>Guardar cotización</button>
                 )}
               </div>
 
               <ItemCotizacionEditor items={itemsCotizacion} onUpdate={setItemsCotizacion} />
 
-              <div style={{ marginTop: "1rem" }}>
+              <div className="mt-4">
                 <div className="form-group">
-                  <label>Concepto de mano de obra</label>
-                  <input type="text" value={conceptoManoObra} onChange={e => setConceptoManoObra(e.target.value)} style={{ width: "100%", padding: "8px" }} />
+                  <label className="form-label">Concepto de mano de obra</label>
+                  <input type="text" value={conceptoManoObra} onChange={e => setConceptoManoObra(e.target.value)} className="form-input" />
                 </div>
                 <div className="form-group">
-                  <label>Costo de mano de obra</label>
-                  <input type="number" min={0} value={costoManoObra} onChange={e => setCostoManoObra(Number(e.target.value))} style={{ padding: "8px" }} />
+                  <label className="form-label">Costo de mano de obra</label>
+                  <input type="number" min={0} value={costoManoObra} onChange={e => setCostoManoObra(Number(e.target.value))} className="form-input" />
                 </div>
               </div>
 
@@ -739,11 +854,13 @@ export default function DetalleOrden() {
               <div className="panel-card">
                 <h3 className="panel-card-title">Autorización del Cliente (RF-15)</h3>
                 <div className="form-group">
-                  <label><input type="checkbox" checked={autorizado} onChange={e => setAutorizado(e.target.checked)} /> Cliente autorizó</label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={autorizado} onChange={e => setAutorizado(e.target.checked)} /> Cliente autorizó
+                  </label>
                 </div>
                 <div className="form-group">
-                  <label>Medio de autorización</label>
-                  <select value={autorizadoPor} onChange={e => setAutorizadoPor(e.target.value)}>
+                  <label className="form-label">Medio de autorización</label>
+                  <select value={autorizadoPor} onChange={e => setAutorizadoPor(e.target.value)} className="form-select">
                     <option value="">Seleccionar</option>
                     <option value="WhatsApp">WhatsApp</option>
                     <option value="Presencial">Presencial</option>
@@ -752,48 +869,59 @@ export default function DetalleOrden() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Evidencia (captura o audio)</label>
-                  <input type="file" onChange={e => setEvidenciaFile(e.target.files?.[0] || null)} />
-                  {evidenciaFile && <p className="text-muted-sm">Archivo: {evidenciaFile.name}</p>}
-                </div>
-                <button className="btn-accion" onClick={guardarAutorizacion}>Guardar autorización</button>
+  <label className="form-label">Evidencia (captura o audio)</label>
+  <label htmlFor="evidencia-input" className="btn-evidencia">
+    <FaFileUpload /> {evidenciaFile ? "Cambiar archivo" : "Seleccionar archivo"}
+  </label>
+  <input
+    id="evidencia-input"
+    type="file"
+    accept="image/*,audio/*"
+    onChange={e => setEvidenciaFile(e.target.files?.[0] || null)}
+    className="input-file-hidden"
+  />
+  {evidenciaFile && <p className="text-muted-sm mt-1">📎 {evidenciaFile.name}</p>}
+</div>
+                <button className="btn-primary" onClick={guardarAutorizacion}>Guardar autorización</button>
               </div>
 
               <div className="panel-card">
                 <h3 className="panel-card-title">Anticipo (RF-16)</h3>
                 <div className="form-group">
-                  <label>Total de cotización</label>
-                  <p className="mono">${total.toLocaleString("es-MX")}</p>
+                  <label className="form-label">Total de cotización</label>
+                  <p className="mono text-lg font-bold">${total.toLocaleString("es-MX")}</p>
                 </div>
                 <div className="form-group">
-                  <label>50% sugerido</label>
+                  <label className="form-label">50% sugerido</label>
                   <p className="mono">${(total * 0.5).toLocaleString("es-MX")}</p>
                 </div>
                 <div className="form-group">
-                  <label>Monto a registrar</label>
-                  <input type="number" min={0} step={100} value={anticipoMonto} onChange={e => setAnticipoMonto(Number(e.target.value))} />
+                  <label className="form-label">Monto a registrar</label>
+                  <input type="number" min={0} step={100} value={anticipoMonto} onChange={e => setAnticipoMonto(Number(e.target.value))} className="form-input" />
                 </div>
                 <div className="form-group">
-                  <label>Forma de pago</label>
-                  <select value={formaPagoAnticipo} onChange={e => setFormaPagoAnticipo(e.target.value as FormaPago)}>
+                  <label className="form-label">Forma de pago</label>
+                  <select value={formaPagoAnticipo} onChange={e => setFormaPagoAnticipo(e.target.value as FormaPago)} className="form-select">
                     <option value="Efectivo">Efectivo</option>
                     <option value="Transferencia">Transferencia</option>
                     <option value="Tarjeta">Tarjeta</option>
                   </select>
                 </div>
-                <button className="btn-accion" onClick={registrarAnticipo}>Registrar anticipo</button>
+                <button className="btn-primary" onClick={registrarAnticipo}>Registrar anticipo</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 4: REFACCIONES (con fotos - RF-19) */}
+        {/* TAB 4: REFACCIONES (con fotos, cambio de estado y agregar) */}
         {tabActivo === "refacciones" && (
           <div className="tab-panel">
             <div className="panel-card">
               <div className="cotizacion-header">
                 <h3 className="panel-card-title">Refacciones</h3>
-                {rol && <button className="btn-accion">+ Agregar refacción</button>}
+                <button className="btn-primary" onClick={() => setMostrarModalRefaccion(true)}>
+                  <FaPlus /> Agregar refacción
+                </button>
               </div>
               <div className="table-wrapper">
                 <table className="cotizacion-table">
@@ -818,32 +946,71 @@ export default function DetalleOrden() {
                         <td className="text-muted-sm">{r.proveedor}</td>
                         <td className="text-center">{r.cantidad}</td>
                         <td className="text-right">${r.costo?.toLocaleString("es-MX")}</td>
-                        <td><span className={`badge-ref ${refEstadoConfig[r.estado]}`}>{r.estado}</span></td>
+                        <td>
+                          <select
+                            value={r.estado}
+                            onChange={(e) => handleCambiarEstadoRefaccion(r.id, e.target.value as EstadoRefaccion)}
+                            className="form-select form-select-sm"
+                          >
+                            <option value="Solicitada">Solicitada</option>
+                            <option value="En camino">En camino</option>
+                            <option value="Recibida">Recibida</option>
+                            <option value="Instalada">Instalada</option>
+                          </select>
+                        </td>
                         <td className="text-muted-sm">{r.fecha_solicitud}</td>
                         <td className="text-muted-sm">{r.fecha_estimada || "—"}</td>
                         <td className="text-muted-sm">{r.fecha_recepcion || "—"}</td>
                         <td>
-                          {r.foto_recibida ? (
-                            <img src={r.foto_recibida} alt="Recibida" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
-                          ) : (
-                            <UploadFoto
-                              onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'recibida', file, preview)}
-                              label="Subir"
-                              className="inline-block"
-                            />
-                          )}
-                        </td>
+  {r.foto_recibida ? (
+    <div className="foto-wrapper">
+      <img
+        src={r.foto_recibida}
+        alt="Recibida"
+        className="foto-thumbnail-sm"
+        onClick={() => setFotoSeleccionada(r.foto_recibida!)}
+      />
+      <button
+        className="btn-eliminar-foto-sm"
+        onClick={() => handleEliminarFotoRefaccion(r.id, 'recibida')}
+      >
+        ×
+      </button>
+    </div>
+  ) : (
+    <UploadFoto
+      onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'recibida', file, preview)}
+      label="Subir"
+      className="inline-block"
+      buttonClassName="upload-btn-compact"
+    />
+  )}
+</td>
                         <td>
-                          {r.foto_instalada ? (
-                            <img src={r.foto_instalada} alt="Instalada" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
-                          ) : (
-                            <UploadFoto
-                              onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'instalada', file, preview)}
-                              label="Subir"
-                              className="inline-block"
-                            />
-                          )}
-                        </td>
+  {r.foto_instalada ? (
+    <div className="foto-wrapper">
+      <img
+        src={r.foto_instalada}
+        alt="Instalada"
+        className="foto-thumbnail-sm"
+        onClick={() => setFotoSeleccionada(r.foto_instalada!)}
+      />
+      <button
+        className="btn-eliminar-foto-sm"
+        onClick={() => handleEliminarFotoRefaccion(r.id, 'instalada')}
+      >
+        ×
+      </button>
+    </div>
+  ) : (
+    <UploadFoto
+      onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'instalada', file, preview)}
+      label="Subir"
+      className="inline-block"
+      buttonClassName="upload-btn-compact"
+    />
+  )}
+</td>
                       </tr>
                     ))}
                   </tbody>
@@ -853,6 +1020,36 @@ export default function DetalleOrden() {
           </div>
         )}
 
+        {/* Modal para agregar refacción */}
+        <Modal isOpen={mostrarModalRefaccion} onClose={() => setMostrarModalRefaccion(false)} title="Agregar refacción">
+          <div className="form-group">
+            <label className="form-label">Nombre *</label>
+            <input type="text" value={nuevaRefaccion.nombre || ''} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, nombre: e.target.value })} className="form-input" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Proveedor *</label>
+            <input type="text" value={nuevaRefaccion.proveedor || ''} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, proveedor: e.target.value })} className="form-input" />
+          </div>
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Cantidad</label>
+              <input type="number" min={1} value={nuevaRefaccion.cantidad || 1} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, cantidad: Number(e.target.value) })} className="form-input" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Costo</label>
+              <input type="number" min={0} value={nuevaRefaccion.costo || 0} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, costo: Number(e.target.value) })} className="form-input" />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Fecha estimada</label>
+            <input type="date" value={nuevaRefaccion.fecha_estimada || ''} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, fecha_estimada: e.target.value })} className="form-input" />
+          </div>
+          <div className="flex gap-2 justify-end mt-4">
+            <button className="btn-secondary" onClick={() => setMostrarModalRefaccion(false)}>Cancelar</button>
+            <button className="btn-primary" onClick={handleAgregarRefaccion}>Guardar refacción</button>
+          </div>
+        </Modal>
+
         {/* TAB 5: REPARACIÓN (con Bitácora y Mecánicos - RF-23 y RF-21) */}
         {tabActivo === "reparacion" && (
           <div className="tab-panel">
@@ -861,7 +1058,7 @@ export default function DetalleOrden() {
               <div className="cotizacion-header">
                 <h3 className="panel-card-title">Bitácora de Avances</h3>
                 <button
-                  className="btn-accion"
+                  className="btn-primary"
                   onClick={() => setMostrarFormAvance(!mostrarFormAvance)}
                 >
                   {mostrarFormAvance ? 'Cancelar' : '+ Registrar avance'}
@@ -869,20 +1066,18 @@ export default function DetalleOrden() {
               </div>
 
               {mostrarFormAvance && (
-                <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--fondo-card)', borderRadius: '8px' }}>
+                <div className="bg-gray-800/20 p-4 rounded-lg mb-4">
                   <div className="form-group">
-                    <label>Descripción del avance</label>
+                    <label className="form-label">Descripción del avance</label>
                     <textarea
                       value={nuevoAvance}
                       onChange={(e) => setNuevoAvance(e.target.value)}
                       rows={3}
                       placeholder="Ej: Se desmontaron las ruedas delanteras..."
-                      style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--borde)', background: 'var(--fondo)', color: 'var(--texto)' }}
+                      className="form-textarea"
                     />
                   </div>
-                  <button className="btn-guardar" onClick={handleAgregarAvance} style={{ marginTop: '8px' }}>
-                    Guardar avance
-                  </button>
+                  <button className="btn-primary mt-2" onClick={handleAgregarAvance}>Guardar avance</button>
                 </div>
               )}
 
@@ -897,21 +1092,9 @@ export default function DetalleOrden() {
                           {typeof b.mecanico === 'string' ? b.mecanico : b.mecanico?.nombre || 'Mecánico'} · {b.creado_en}
                         </span>
                       </div>
-                      <div className="bitacora-acciones" style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                        <button
-                          className="btn-icon btn-editar"
-                          onClick={() => handleEditarAvance(b)}
-                          title="Editar avance"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          className="btn-icon btn-eliminar"
-                          onClick={() => handleEliminarAvance(b.id)}
-                          title="Eliminar avance"
-                        >
-                          <FaTrash />
-                        </button>
+                      <div className="bitacora-acciones">
+                        <button className="btn-icon btn-edit" onClick={() => handleEditarAvance(b)} title="Editar avance"><FaEdit /></button>
+                        <button className="btn-icon btn-danger" onClick={() => handleEliminarAvance(b.id)} title="Eliminar avance"><FaTrash /></button>
                       </div>
                     </div>
                   ))
@@ -924,23 +1107,23 @@ export default function DetalleOrden() {
             {/* Panel de Mecánicos Asignados (RF-21) */}
             <div className="panel-card">
               <h3 className="panel-card-title">Mecánicos Asignados</h3>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <div className="flex flex-wrap gap-2 mb-2">
                 {orden.mecanicos && orden.mecanicos.length > 0 ? (
                   orden.mecanicos.map(m => (
-                    <span key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--primario)', padding: '4px 10px', borderRadius: '20px', color: 'white', fontSize: '0.8rem' }}>
+                    <span key={m.id} className="badge-mecanico">
                       {m.nombre}
-                      <button onClick={() => handleRemoverMecanico(m.id)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>×</button>
+                      <button onClick={() => handleRemoverMecanico(m.id)} className="ml-1 hover:text-red-400">×</button>
                     </span>
                   ))
                 ) : (
                   <span className="text-muted-sm">Ningún mecánico asignado</span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="flex gap-2">
                 <select
                   value={mecanicoSeleccionado}
                   onChange={(e) => setMecanicoSeleccionado(e.target.value)}
-                  style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--borde)', background: 'var(--fondo)', color: 'var(--texto)' }}
+                  className="form-select"
                 >
                   <option value="">Seleccionar mecánico...</option>
                   {mecanicosDisponibles
@@ -949,7 +1132,7 @@ export default function DetalleOrden() {
                       <option key={m.id} value={m.id}>{m.nombre}</option>
                     ))}
                 </select>
-                <button className="btn-accion" onClick={handleAgregarMecanico}>Asignar</button>
+                <button className="btn-primary" onClick={handleAgregarMecanico}>Asignar</button>
               </div>
             </div>
 
@@ -957,13 +1140,28 @@ export default function DetalleOrden() {
               <h3 className="panel-card-title"><FaCamera /> Fotografías de Reparación</h3>
               <div className="flex flex-wrap gap-2">
                 {fotosReparacion.map((url, idx) => (
-                  <img key={idx} src={url} alt={`Reparación ${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
+                  <div key={idx} className="foto-wrapper">
+                    <img
+                      src={url}
+                      alt={`Reparación ${idx+1}`}
+                      className="foto-thumbnail"
+                      onClick={() => setFotoSeleccionada(url)}
+                    />
+                    <button
+                      className="btn-eliminar-foto"
+                      onClick={() => handleEliminarFotoEtapa('Reparación', url)}
+                      title="Eliminar foto"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
               <UploadFoto
                 onUpload={(file, preview) => handleSubirFotoEtapa('Reparación', file, preview)}
                 label="Agregar foto"
                 className="mt-2"
+                buttonClassName="btn-success btn-sm"
               />
             </div>
           </div>
@@ -978,11 +1176,11 @@ export default function DetalleOrden() {
                 value={textoEditado}
                 onChange={(e) => setTextoEditado(e.target.value)}
                 rows={3}
-                style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--borde)', background: 'var(--fondo)', color: 'var(--texto)' }}
+                className="form-textarea"
               />
               <div style={{ display: 'flex', gap: '8px', marginTop: '1rem', justifyContent: 'flex-end' }}>
-                <button className="btn-cancelar" onClick={() => setAvanceEditando(null)}>Cancelar</button>
-                <button className="btn-guardar" onClick={handleGuardarEdicionAvance}>Guardar cambios</button>
+                <button className="btn-secondary" onClick={() => setAvanceEditando(null)}>Cancelar</button>
+                <button className="btn-primary" onClick={handleGuardarEdicionAvance}>Guardar cambios</button>
               </div>
             </div>
           </div>
@@ -996,49 +1194,49 @@ export default function DetalleOrden() {
                 <h3 className="panel-card-title">Prueba Final</h3>
                 <div className="checklist-lista">
                   {[
-  { label: "Sin daños nuevos", key: "sin_danos" },
-  { label: "Piezas instaladas OK", key: "piezas_ok" },
-  { label: "Prueba de funcionamiento OK", key: "prueba_ok" },
-].map((item) => (
-  <div key={item.key} className="check-item">
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={!!orden.checklist?.prueba_final?.[item.key as keyof Checklist]}
-        onChange={(e) => handleChecklistChange('prueba_final', item.key as keyof Checklist, e.target.checked)}
-      />
-      <span>{item.label}</span>
-    </label>
-  </div>
-))}
+                    { label: "Sin daños nuevos", key: "sin_danos" },
+                    { label: "Piezas instaladas OK", key: "piezas_ok" },
+                    { label: "Prueba de funcionamiento OK", key: "prueba_ok" },
+                  ].map((item) => (
+                    <div key={item.key} className="check-item">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!orden.checklist?.prueba_final?.[item.key as keyof Checklist]}
+                          onChange={(e) => handleChecklistChange('prueba_final', item.key as keyof Checklist, e.target.checked)}
+                        />
+                        <span>{item.label}</span>
+                      </label>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="panel-card">
                 <h3 className="panel-card-title">Checklist de Entrega</h3>
                 <div className="checklist-lista">
                   {[
-  { label: "Vehículo limpio", key: "limpieza" },
-  { label: "Sin daños en la entrega", key: "sin_danos" },
-  { label: "Llaves entregadas", key: "llaves_ok" },
-].map((item) => (
-  <div key={item.key} className="check-item">
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={!!orden.checklist?.entrega?.[item.key as keyof Checklist]}
-        onChange={(e) => handleChecklistChange('entrega', item.key as keyof Checklist, e.target.checked)}
-      />
-      <span>{item.label}</span>
-    </label>
-  </div>
-))}
+                    { label: "Vehículo limpio", key: "limpieza" },
+                    { label: "Sin daños en la entrega", key: "sin_danos" },
+                    { label: "Llaves entregadas", key: "llaves_ok" },
+                  ].map((item) => (
+                    <div key={item.key} className="check-item">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!orden.checklist?.entrega?.[item.key as keyof Checklist]}
+                          onChange={(e) => handleChecklistChange('entrega', item.key as keyof Checklist, e.target.checked)}
+                        />
+                        <span>{item.label}</span>
+                      </label>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 7: ENTREGA (con firma y fotos) */}
+        {/* TAB 7: ENTREGA (con firma y fotos) - CORREGIDO: usa fotosEntrega */}
         {tabActivo === "entrega" && (
           <div className="tab-panel">
             <div className="panel-grid-2">
@@ -1052,18 +1250,18 @@ export default function DetalleOrden() {
                 {rol === "admin" && (
                   <>
                     <div className="form-group">
-                      <label>Monto a cobrar</label>
-                      <input type="number" min={0} step={100} value={pagoFinalMonto} onChange={e => setPagoFinalMonto(Number(e.target.value))} placeholder={String(total - anticipoMonto)} />
+                      <label className="form-label">Monto a cobrar</label>
+                      <input type="number" min={0} step={100} value={pagoFinalMonto} onChange={e => setPagoFinalMonto(Number(e.target.value))} className="form-input" placeholder={String(total - anticipoMonto)} />
                     </div>
                     <div className="form-group">
-                      <label>Forma de pago</label>
-                      <select value={formaPagoFinal} onChange={e => setFormaPagoFinal(e.target.value as FormaPago)}>
+                      <label className="form-label">Forma de pago</label>
+                      <select value={formaPagoFinal} onChange={e => setFormaPagoFinal(e.target.value as FormaPago)} className="form-select">
                         <option value="Efectivo">Efectivo</option>
                         <option value="Transferencia">Transferencia</option>
                         <option value="Tarjeta">Tarjeta</option>
                       </select>
                     </div>
-                    <button className="btn-accion mt-1" onClick={registrarPagoFinal}>Registrar pago final</button>
+                    <button className="btn-primary mt-2" onClick={registrarPagoFinal}>Registrar pago final</button>
                   </>
                 )}
               </div>
@@ -1072,7 +1270,7 @@ export default function DetalleOrden() {
                 {firmaBase64 ? (
                   <div>
                     <img src={firmaBase64} alt="Firma del cliente" className="max-w-full h-auto border rounded" />
-                    <button className="btn-accion mt-2" onClick={() => { setFirmaBase64(undefined); updateOrden(orden.id, { firma_Cliente: undefined }); showToast("Firma eliminada", "info"); }}>Eliminar firma</button>
+                    <button className="btn-danger mt-2" onClick={() => { setFirmaBase64(undefined); updateOrden(orden.id, { firma_Cliente: undefined }); showToast("Firma eliminada", "info"); }}>Eliminar firma</button>
                   </div>
                 ) : mostrarFirma ? (
                   <FirmaDigital
@@ -1085,7 +1283,7 @@ export default function DetalleOrden() {
                     onCancel={() => setMostrarFirma(false)}
                   />
                 ) : (
-                  <button className="btn-accion" onClick={() => setMostrarFirma(true)}>Capturar firma</button>
+                  <button className="btn-primary" onClick={() => setMostrarFirma(true)}>Capturar firma</button>
                 )}
               </div>
             </div>
@@ -1093,18 +1291,40 @@ export default function DetalleOrden() {
               <h3 className="panel-card-title"><FaCamera /> Fotografías de Entrega</h3>
               <div className="flex flex-wrap gap-2">
                 {fotosEntrega.map((url, idx) => (
-                  <img key={idx} src={url} alt={`Entrega ${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
+                  <div key={idx} className="foto-wrapper">
+                    <img
+                      src={url}
+                      alt={`Entrega ${idx+1}`}
+                      className="foto-thumbnail"
+                      onClick={() => setFotoSeleccionada(url)}
+                    />
+                    <button
+                      className="btn-eliminar-foto"
+                      onClick={() => handleEliminarFotoEtapa('Entrega', url)}
+                      title="Eliminar foto"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
               <UploadFoto
                 onUpload={(file, preview) => handleSubirFotoEtapa('Entrega', file, preview)}
                 label="Agregar foto"
                 className="mt-2"
+                buttonClassName="btn-success btn-sm"
               />
             </div>
           </div>
         )}
       </div>
+
+      {/* Modal para ver foto en grande */}
+      <Modal isOpen={!!fotoSeleccionada} onClose={() => setFotoSeleccionada(null)} title="Ver foto">
+        {fotoSeleccionada && (
+          <img src={fotoSeleccionada} alt="Foto" className="w-full h-auto max-h-[80vh] object-contain" />
+        )}
+      </Modal>
 
       {/* Toasts */}
       {toasts.map((toast) => (

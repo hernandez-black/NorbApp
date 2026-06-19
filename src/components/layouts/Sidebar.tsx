@@ -26,6 +26,7 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
           <li><Link to="/vehiculos" onClick={handleClose}>Vehículos</Link></li>
           <li><Link to="/clientes" onClick={handleClose}>Clientes</Link></li>
           <li><Link to="/ordenes" onClick={handleClose}>Órdenes</Link></li>
+          <li><Link to="/mecanicos" onClick={handleClose}>Mecánicos</Link></li>
           <li><Link to="/administracion" onClick={handleClose}>Administración</Link></li>
         </ul>
       </nav>

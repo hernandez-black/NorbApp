@@ -1,5 +1,5 @@
-// UploadFoto.tsx - Componente para subir imágenes
-import { useState, useRef } from 'react';
+// src/components/ui/UploadFoto.tsx
+import { useState, useRef, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import { FaCamera, FaTimes } from 'react-icons/fa';
 
@@ -10,7 +10,11 @@ interface UploadFotoProps {
   accept?: string;
   maxSize?: number; // en MB
   className?: string;
-  previewImage?: string; // imagen existente para mostrar
+  previewImage?: string;
+  buttonClassName?: string;
+  autoHideDuration?: number | null; // tiempo en ms para ocultar la imagen (null = no ocultar)
+  /** Tamaño de la miniatura de preview en px (default 48, usa 64 para vistas grandes) */
+  thumbSize?: number;
 }
 
 export default function UploadFoto({
@@ -21,16 +25,33 @@ export default function UploadFoto({
   maxSize = 5,
   className = '',
   previewImage,
+  buttonClassName = '',
+  autoHideDuration = 3000, // por defecto 3 segundos
+  thumbSize = 48,
 }: UploadFotoProps) {
   const [preview, setPreview] = useState<string | null>(previewImage || null);
   const [error, setError] = useState<string | null>(null);
+  const [isVisible, setIsVisible] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Efecto para ocultar la imagen después de autoHideDuration
+  useEffect(() => {
+    if (preview && autoHideDuration !== null && autoHideDuration > 0) {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+      }, autoHideDuration);
+    }
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, [preview, autoHideDuration]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar tamaño
     if (file.size > maxSize * 1024 * 1024) {
       setError(`El archivo no debe superar los ${maxSize}MB`);
       return;
@@ -41,6 +62,7 @@ export default function UploadFoto({
     reader.onloadend = () => {
       const result = reader.result as string;
       setPreview(result);
+      setIsVisible(true);
       onUpload(file, result);
     };
     reader.readAsDataURL(file);
@@ -48,52 +70,74 @@ export default function UploadFoto({
 
   const handleRemove = () => {
     setPreview(null);
+    setIsVisible(true);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (onRemove) onRemove();
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
   };
 
   const handleClick = () => {
     fileInputRef.current?.click();
   };
 
-  return (
-    <div className={`flex flex-col gap-2 ${className}`}>
-      <div className="relative">
-        {preview ? (
-          <div className="relative inline-block">
-            <img
-              src={preview}
-              alt="Vista previa"
-              className="w-32 h-32 object-cover rounded-lg border border-gray-200"
-            />
-            <button
-              onClick={handleRemove}
-              className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-              type="button"
-            >
-              <FaTimes size={12} />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleClick}
-            className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors bg-gray-50 hover:bg-gray-100"
-            type="button"
-          >
-            <FaCamera className="text-3xl text-gray-400" />
-            <span className="text-xs text-gray-500 mt-1">{label}</span>
-          </button>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={accept}
-          onChange={handleFileChange}
-          className="hidden"
-        />
+  const hiddenInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept={accept}
+      onChange={handleFileChange}
+      className="upload-foto-input-oculto"
+    />
+  );
+
+  // Si no es visible (auto-hide), mostrar solo un link para revelar de nuevo
+  if (!isVisible && preview) {
+    return (
+      <div className={`upload-foto-wrapper ${className}`}>
+        <button
+          onClick={() => setIsVisible(true)}
+          type="button"
+          className="upload-foto-mostrar-link"
+        >
+          Mostrar foto
+        </button>
+        {hiddenInput}
       </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+    );
+  }
+
+  return (
+    <div className={`upload-foto-wrapper ${className}`}>
+      {preview ? (
+        <div className="upload-foto-preview-box">
+          <img
+            src={preview}
+            alt="Vista previa"
+            className="upload-foto-preview-img"
+            style={{ width: thumbSize, height: thumbSize }}
+          />
+          <button
+            onClick={handleRemove}
+            className="upload-foto-btn-remove"
+            type="button"
+            title="Eliminar"
+          >
+            <FaTimes size={10} />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={handleClick}
+          className={buttonClassName ? buttonClassName : 'upload-foto-btn-default'}
+          type="button"
+        >
+          <FaCamera className="upload-foto-icon" />
+          <span>{label}</span>
+        </button>
+      )}
+      {hiddenInput}
+      {error && <p className="upload-foto-error">{error}</p>}
     </div>
   );
 }

@@ -1,17 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaPlus, FaSearch, FaEye } from "react-icons/fa";
-import type { EstadoOrden, OrdenResumen } from "../../types";
-import {useOrdenes} from '../../context/useOrdenes';
+import type { EstadoOrden} from "../../types";
+import { useOrdenes } from '../../context/useOrdenes';
 import "../../css/Orden/Ordenes.css";
 
-const ordenesIniciales: OrdenResumen[] = [
-  { id: "1", numero: "ORD-001", cliente: "Carlos Ramírez",  vehiculo: "Toyota Corolla 2020", mecanico: "Juan Pérez",  estado: "Autorizado",     fecha: "08/06/2025" },
-  { id: "2", numero: "ORD-002", cliente: "María López",     vehiculo: "Nissan Sentra 2018",  mecanico: "Luis Torres", estado: "Diagnosticado",  fecha: "07/06/2025" },
-  { id: "3", numero: "ORD-003", cliente: "Roberto Silva",   vehiculo: "Chevrolet Aveo 2019", mecanico: "Pedro Gómez", estado: "Ingresado",      fecha: "06/06/2025" },
-  { id: "4", numero: "ORD-004", cliente: "Ana Martínez",    vehiculo: "VW Jetta 2021",       mecanico: "Juan Pérez",  estado: "Terminado",      fecha: "05/06/2025" },
-  { id: "5", numero: "ORD-005", cliente: "Jorge Hernández", vehiculo: "Ford Fiesta 2017",    mecanico: "Luis Torres", estado: "Autorizado",     fecha: "05/06/2025" },
-];
+// Los estados posibles
+const ESTADOS: EstadoOrden[] = ["Ingresado", "Diagnosticado", "Autorizado", "Terminado"];
 
 const estadoConfig: Record<EstadoOrden, string> = {
   "Ingresado":     "badge-ingresado",
@@ -20,17 +15,15 @@ const estadoConfig: Record<EstadoOrden, string> = {
   "Terminado":     "badge-terminado",
 };
 
-const ESTADOS: EstadoOrden[] = ["Ingresado", "Diagnosticado", "Autorizado", "Terminado"];
-
 export default function Ordenes() {
-  const { ordenesResumen } = useOrdenes();
+  const { ordenesResumen, updateOrden } = useOrdenes();
   const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<string>("Todos");
-
   const rol = localStorage.getItem("rol");
 
-  const sourceList = ordenesResumen && ordenesResumen.length ? ordenesResumen : ordenesIniciales;
+  // Usamos ordenesResumen si existe, si no, usamos un mock local (pero ahora usamos el contexto)
+  const sourceList = ordenesResumen && ordenesResumen.length ? ordenesResumen : [];
 
   const ordenesFiltradas = sourceList.filter((o) => {
     const coincide = [o.numero, o.cliente, o.vehiculo]
@@ -40,9 +33,13 @@ export default function Ordenes() {
     return coincide && estado;
   });
 
+  // Función para cambiar estado
+  const handleCambiarEstado = (id: string, nuevoEstado: EstadoOrden) => {
+    updateOrden(id, { estado: nuevoEstado });
+  };
+
   return (
     <div className="ordenes">
-
       <div className="ordenes-header">
         <div>
           <h1 className="ordenes-title">Órdenes de Servicio</h1>
@@ -96,29 +93,54 @@ export default function Ordenes() {
             </thead>
             <tbody>
               {ordenesFiltradas.length > 0 ? (
-                ordenesFiltradas.map((o) => (
-                  <tr key={o.id}>
-                    <td className="orden-num">{o.numero}</td>
-                    <td className="texto-blanco">{o.cliente}</td>
-                    <td className="text-muted">{o.vehiculo}</td>
-                    <td className="text-muted">{o.mecanico}</td>
-                    <td>
-                      <span className={`badge ${estadoConfig[o.estado]}`}>
-                        {o.estado}
-                      </span>
-                    </td>
-                    <td className="text-muted">{o.fecha}</td>
-                    <td>
-                      <button
-                        className="btn-ver"
-                        onClick={() => navigate(`/ordenes/${o.id}`)}
-                        title="Ver detalle"
-                      >
-                        <FaEye /> Ver
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                ordenesFiltradas.map((o) => {
+                  // Buscamos la orden completa para obtener el ID real (necesario para updateOrden)
+                  // const ordenCompleta = ordenes.find(ord => ord.id === o.id);
+                  return (
+                    <tr key={o.id}>
+                      <td className="orden-num">{o.numero}</td>
+                      <td className="texto-blanco">{o.cliente}</td>
+                      <td className="text-muted">{o.vehiculo}</td>
+                      <td className="text-muted">{o.mecanico}</td>
+                      <td>
+                        {rol === "admin" ? (
+                          <select
+                            value={o.estado}
+                            onChange={(e) => handleCambiarEstado(o.id, e.target.value as EstadoOrden)}
+                            className="form-select-sm"
+                            style={{ 
+                              background: 'var(--fondo-card)',
+                              color: 'var(--texto)',
+                              border: '1px solid var(--borde)',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {ESTADOS.map((est) => (
+                              <option key={est} value={est}>{est}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className={`badge ${estadoConfig[o.estado]}`}>
+                            {o.estado}
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-muted">{o.fecha}</td>
+                      <td>
+                        <button
+                          className="btn-ver"
+                          onClick={() => navigate(`/ordenes/${o.id}`)}
+                          title="Ver detalle"
+                        >
+                          <FaEye /> Ver
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={7} className="tabla-vacia">
@@ -130,7 +152,6 @@ export default function Ordenes() {
           </table>
         </div>
       </div>
-
     </div>
   );
 }
