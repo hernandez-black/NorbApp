@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaEye, FaEyeSlash, FaLock, FaEnvelope } from "react-icons/fa";
+import { useNavigate, Link } from "react-router-dom";
+import { FaEye, FaEyeSlash, FaLock, FaEnvelope, FaArrowLeft } from "react-icons/fa";
 import "../css/Login/Login.css";
 
 export default function Login() {
@@ -20,26 +20,29 @@ export default function Login() {
 
     setLoading(true);
 
-    // --- Aquí irá la llamada a Supabase Auth cuando tengas las credenciales ---
-    // const { error } = await supabase.auth.signInWithPassword({ email, password })
-    // Por ahora simulamos el login:
+    // Simulación de login (después reemplazar con Supabase Auth)
     setTimeout(() => {
-  if (form.email === "admin@norba.com" && form.password === "admin123") {
-    localStorage.setItem("rol", "admin");
-    navigate("/dashboard");
-  } else if (form.email === "mecanico@norba.com" && form.password === "mec123") {
-    localStorage.setItem("rol", "mecanico");
-    navigate("/ordenes");
-  } else {
-    setError("Correo o contraseña incorrectos.");
-  }
-  setLoading(false);
-}, 800);
+      if (form.email === "admin@norba.com" && form.password === "admin123") {
+        localStorage.setItem("rol", "admin");
+        navigate("/administracion");
+      } else if (form.email === "mecanico@norba.com" && form.password === "mec123") {
+        localStorage.setItem("rol", "mecanico");
+        navigate("/ordenes");
+      } else {
+        setError("Correo o contraseña incorrectos.");
+      }
+      setLoading(false);
+    }, 800);
   };
 
   return (
     <div className="login-page">
       <div className="login-card">
+
+        {/* Botón Volver al inicio (esquina superior izquierda) */}
+        <Link to="/" className="btn-volver-inicio">
+          <FaArrowLeft /> Volver al inicio
+        </Link>
 
         {/* Logo */}
         <div className="login-logo">

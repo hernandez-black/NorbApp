@@ -255,3 +255,24 @@
     padding: 2rem 1.5rem;
   }
 }
+
+/* ─── Botón Volver al inicio ────────────────────────────── */
+.btn-volver-inicio {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--texto-muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: color 0.2s;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.btn-volver-inicio:hover {
+  color: var(--texto);
+}
+

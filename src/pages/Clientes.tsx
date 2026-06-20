@@ -1,14 +1,25 @@
 import { useState } from "react";
 import { FaUsers, FaPlus, FaSearch, FaEdit, FaTrash, FaHistory } from "react-icons/fa";
-import type { Cliente } from "../types";
+import type { Cliente, Vehiculo } from "../types";
 import "../css/Shared.css";
+import "../css/VehiculoCard/VehiculoCard.css";
+import VehiculoCard from "./VehiculoCard";
 
+// Mocks de clientes y vehículos (puedes moverlos a un archivo central)
 const clientesIniciales: Cliente[] = [
   { id: "1", nombre: "Carlos Ramírez",  telefono: "555-123-4567", correo: "carlos@mail.com",  tipo: "particular", creado_en: "01/01/2025" },
   { id: "2", nombre: "María López",     telefono: "555-234-5678", correo: "maria@mail.com",   tipo: "particular", creado_en: "15/02/2025" },
   { id: "3", nombre: "Transportes RSA", telefono: "555-345-6789", correo: "rsa@empresa.com",  tipo: "empresa", razon_social: "Transportes RSA S.A. de C.V.", rfc: "TRS123456ABC", creado_en: "10/03/2025" },
   { id: "4", nombre: "Ana Martínez",    telefono: "555-456-7890", correo: "ana@mail.com",     tipo: "particular", creado_en: "22/04/2025" },
   { id: "5", nombre: "Jorge Hernández", telefono: "555-567-8901", correo: "jorge@mail.com",   tipo: "particular", creado_en: "05/05/2025" },
+];
+
+// Datos de vehículos (igual que en Vehiculos.tsx)
+const vehiculosMock: Vehiculo[] = [
+  { id: "1", cliente_id: "1", marca: "Toyota", modelo: "Corolla", anio: 2020, color: "Blanco", placas: "ABC-123", kilometraje: 45000, vin: "1HGBH41JXMN109186", motor: "2.0L", cilindraje: "4 cilindros", creado_en: "08/06/2025" },
+  { id: "2", cliente_id: "2", marca: "Nissan", modelo: "Sentra", anio: 2018, color: "Gris", placas: "DEF-456", kilometraje: 72000, vin: "3N1AB7AP0JY123456", motor: "1.8L", cilindraje: "4 cilindros", creado_en: "07/06/2025" },
+  { id: "3", cliente_id: "3", marca: "Chevrolet", modelo: "Aveo", anio: 2019, color: "Rojo", placas: "GHI-789", kilometraje: 38000, motor: "1.6L", cilindraje: "4 cilindros", creado_en: "06/06/2025" },
+  { id: "4", cliente_id: "4", marca: "Volkswagen", modelo: "Jetta", anio: 2021, color: "Negro", placas: "JKL-012", kilometraje: 21000, vin: "3VW2B7AJ0MM123789", motor: "1.4T", cilindraje: "4 cilindros", creado_en: "05/06/2025" },
 ];
 
 const formVacio = {
@@ -24,6 +35,22 @@ export default function Clientes() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<Cliente | null>(null);
   const [form, setForm] = useState(formVacio);
+
+  // Estado para el modal de vehículos
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [vehiculosCliente, setVehiculosCliente] = useState<Vehiculo[]>([]);
+
+  // Función para abrir el modal con los vehículos del cliente
+  const handleVerVehiculos = (cliente: Cliente) => {
+    const vehiculos = vehiculosMock.filter(v => v.cliente_id === cliente.id);
+    setClienteSeleccionado(cliente);
+    setVehiculosCliente(vehiculos);
+  };
+
+  const handleCerrarModal = () => {
+    setClienteSeleccionado(null);
+    setVehiculosCliente([]);
+  };
 
   const filtrados = clientes.filter((c) => {
     const coincide = [c.nombre, c.telefono, c.correo ?? ""]
@@ -80,11 +107,12 @@ export default function Clientes() {
         </button>
       </div>
 
-      {/* Formulario */}
+      {/* Formulario (sin cambios) */}
       {mostrarForm && (
         <div className="form-card">
           <h2 className="form-title">{editando ? "Editar Cliente" : "Nuevo Cliente"}</h2>
           <div className="form-grid-2">
+            {/* ... campos igual que antes ... */}
             <div className="form-group">
               <label>Nombre completo *</label>
               <input type="text" placeholder="Ej. Carlos Ramírez"
@@ -181,7 +209,13 @@ export default function Clientes() {
                   <td className="text-muted">{c.creado_en}</td>
                   <td>
                     <div className="acciones">
-                      <button className="btn-icon btn-historial" title="Ver historial"><FaHistory /></button>
+                      <button 
+                        className="btn-icon btn-historial" 
+                        title="Ver vehículos"
+                        onClick={() => handleVerVehiculos(c)}
+                      >
+                        <FaHistory />
+                      </button>
                       <button className="btn-icon btn-editar" title="Editar" onClick={() => handleEditar(c)}><FaEdit /></button>
                       <button className="btn-icon btn-eliminar" title="Eliminar" onClick={() => handleEliminar(c.id)}><FaTrash /></button>
                     </div>
@@ -195,6 +229,14 @@ export default function Clientes() {
         </div>
       </div>
 
+      {/* Modal de vehículos */}
+      {clienteSeleccionado && (
+        <VehiculoCard
+          cliente={clienteSeleccionado}
+          vehiculos={vehiculosCliente}
+          onClose={handleCerrarModal}
+        />
+      )}
     </div>
   );
 }
