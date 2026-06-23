@@ -9,29 +9,29 @@ interface MainLayoutProps {
   children: ReactNode;
 }
 
-export default function MainLayout({
-  children,
-}: MainLayoutProps) {
+export default function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const showSidebar = location.pathname !== "/" || sidebarOpen;
 
-useEffect(() => {
-  if (sidebarOpen) {
-    setSidebarOpen(false);
-  }
-}, [location.pathname, sidebarOpen]);
+  // Cerrar sidebar al cambiar de ruta (solo si está abierto)
+  useEffect(() => {
+    if (sidebarOpen) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname, sidebarOpen]); // 👈 Agregamos sidebarOpen a dependencias
 
   const openSidebar = () => setSidebarOpen(true);
   const closeSidebar = () => setSidebarOpen(false);
 
+  // No ocultamos el sidebar en ninguna ruta, siempre está en el DOM
+  // Solo lo ocultamos visualmente con CSS en móvil
   return (
     <div className="layout">
-      {showSidebar && <Sidebar open={sidebarOpen} onClose={closeSidebar} />}
+      {/* Sidebar siempre renderizado, la clase "open" controla su visibilidad */}
+      <Sidebar open={sidebarOpen} onClose={closeSidebar} />
 
-      {showSidebar && sidebarOpen && (
-        <div className="sidebar-overlay" onClick={closeSidebar} />
-      )}
+      {/* Overlay solo cuando sidebar está abierto en móvil */}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar} />}
 
       <div className="content-area">
         <Navbar onMenuClick={openSidebar} />

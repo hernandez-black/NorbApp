@@ -1,6 +1,9 @@
 // ─── ROLES ────────────────────────────────────────────────
 export type Rol = "admin" | "mecanico" | "recepcion";
 
+// ─── TIPO DE ORDEN (RF-21) ─────────────────────────
+export type TipoOrden = "preventivo" | "correctivo" | "diagnostico de fallas";
+
 // ─── USUARIO ──────────────────────────────────────────────
 export interface Usuario {
   id: string;
@@ -55,6 +58,7 @@ export interface OrdenResumen {
   mecanico: string;
   estado: EstadoOrden;
   fecha: string;
+  tipo?: TipoOrden; // opcional, se puede mapear desde Orden completa
 }
 
 
@@ -88,7 +92,10 @@ export interface Orden {
   mecanicos?: Usuario[];        // para mostrar en resumen y detalles
   fecha?: string; // alias conveniente para interfaces existentes (puede mapear a creado_en)
   evidencias?: Evidencia[];     // para mostrar fotos en detalles
-  firma_Cliente?: string;          // base64 de la firma digital (para mostrar en detalles) 
+  firma_Cliente?: string;          // base64 de la firma digital (para mostrar en detalles)
+  tipo?: TipoOrden;
+  checklist_extra?: {id: string; seccion: 'prueba_final' | 'entrega'; label: string; checked: boolean} [];
+  carta_compromiso_url?: string; // URL del PDF de carta compromiso en Supabase Storage
 }
 
 // ─── DIAGNÓSTICO ──────────────────────────────────────────

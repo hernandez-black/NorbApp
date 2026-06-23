@@ -21,7 +21,6 @@ const loadOrdenes = (): Orden[] => {
   } catch (e) {
     console.warn('Error al cargar órdenes desde localStorage:', e);
   }
-  // Si no hay datos en localStorage, usar los mocks
   return ordenesMock;
 };
 
@@ -99,6 +98,7 @@ const mockChecklistEntrega: Checklist = {
   sin_danos: false, limpieza: false, piezas_ok: false, llaves_ok: false,
 };
 
+// 👇 ORDEN MOCK ACTUALIZADA CON tipo Y checklist_extra (para pruebas)
 const ordenesMock: Orden[] = [
   {
     id: "1",
@@ -126,16 +126,22 @@ const ordenesMock: Orden[] = [
       { id: "o2", orden_id: "1", descripcion: "Gato hidráulico", cantidad: 1 },
     ],
     mecanicos: [],
+    tipo: "correctivo", // 👈 NUEVO: tipo de orden
+    checklist_extra: [ // 👈 NUEVO: items extra para checklist (para pruebas)
+      { id: "ce1", seccion: "prueba_final", label: "Verificar nivel de aceite", checked: false },
+      { id: "ce2", seccion: "entrega", label: "Entregar manual de usuario", checked: true },
+    ],
   },
 ];
 
-// ---- Tipos del contexto ----
+// ---- Tipos del contexto (con deleteOrden) ----
 interface OrdenContextType {
   ordenes: Orden[];
   ordenesResumen: OrdenResumen[];
   getOrdenById: (id: string) => Orden | undefined;
   updateOrden: (id: string, data: Partial<Orden>) => void;
   createOrden: (orden: Omit<Orden, 'id' | 'numero' | 'creado_en'>) => void;
+  deleteOrden: (id: string) => void; // 👈 NUEVO
 }
 
 // ---- Contexto ----
@@ -143,10 +149,9 @@ export const OrdenContext = createContext<OrdenContextType | undefined>(undefine
 
 // ---- Provider ----
 export const OrdenProvider = ({ children }: { children: ReactNode }) => {
-  // 🔥 Usar loadOrdenes() para cargar desde localStorage o mocks
   const [ordenes, setOrdenes] = useState<Orden[]>(loadOrdenes);
 
-  // 🔥 Guardar en localStorage cada vez que cambien las órdenes
+  // Guardar en localStorage cada vez que cambien las órdenes
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(ordenes));
@@ -189,9 +194,16 @@ export const OrdenProvider = ({ children }: { children: ReactNode }) => {
       checklist: orden.checklist || defaultChecklist,
       objetos: orden.objetos || [],
       mecanicos: orden.mecanicos || [],
+      tipo: orden.tipo,
+      checklist_extra: orden.checklist_extra || [],
     };
 
     setOrdenes(prev => [...prev, newOrden]);
+  };
+
+  // 👇 NUEVA FUNCIÓN deleteOrden
+  const deleteOrden = (id: string) => {
+    setOrdenes(prev => prev.filter(o => o.id !== id));
   };
 
   const ordenesResumen: OrdenResumen[] = ordenes.map(o => ({
@@ -202,10 +214,18 @@ export const OrdenProvider = ({ children }: { children: ReactNode }) => {
     mecanico: "No asignado",
     estado: o.estado,
     fecha: o.creado_en,
+    tipo: o.tipo,
   }));
 
   return (
-    <OrdenContext.Provider value={{ ordenes, ordenesResumen, getOrdenById, updateOrden, createOrden }}>
+    <OrdenContext.Provider value={{ 
+      ordenes, 
+      ordenesResumen, 
+      getOrdenById, 
+      updateOrden, 
+      createOrden,
+      deleteOrden // 👈 EXPORTADO
+    }}>
       {children}
     </OrdenContext.Provider>
   );

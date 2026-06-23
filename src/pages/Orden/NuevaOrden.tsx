@@ -1,9 +1,8 @@
 // src/pages/Orden/NuevaOrden.tsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Cliente, Vehiculo } from '../../types';
-import {useOrdenes} from '../../context/useOrdenes';
-
+import type { Cliente, Vehiculo, TipoOrden } from '../../types';
+import { useOrdenes } from '../../context/useOrdenes';
 
 // Mock de clientes y vehículos (deberían venir de su propio contexto, pero usamos los mismos mocks)
 const clientesMock: Cliente[] = [
@@ -23,10 +22,11 @@ const vehiculosMock: Vehiculo[] = [
 
 export default function NuevaOrden() {
   const navigate = useNavigate();
-  const { createOrden } = useOrdenes(); // Usamos el hook importado
+  const { createOrden } = useOrdenes();
   const [clienteId, setClienteId] = useState('');
   const [vehiculoId, setVehiculoId] = useState('');
   const [motivoIngreso, setMotivoIngreso] = useState('');
+  const [tipo, setTipo] = useState<TipoOrden>('preventivo'); 
 
   const handleSubmit = () => {
     if (!clienteId || !vehiculoId) {
@@ -34,7 +34,6 @@ export default function NuevaOrden() {
       return;
     }
 
-    // Buscar el cliente y vehículo completos
     const cliente = clientesMock.find(c => c.id === clienteId);
     const vehiculo = vehiculosMock.find(v => v.id === vehiculoId);
 
@@ -53,9 +52,9 @@ export default function NuevaOrden() {
       pago_final: 0,
       autorizado: false,
       autorizado_por: undefined,
-      // 🔥 Pasamos los objetos completos
-      cliente: cliente,
-      vehiculo: vehiculo,
+      tipo, // 👈 NUEVO
+      cliente,
+      vehiculo,
     });
     navigate('/ordenes');
   };
@@ -63,15 +62,17 @@ export default function NuevaOrden() {
   return (
     <div className="form-card">
       <h2>Nueva Orden de Servicio</h2>
+
       <div className="form-group">
-        <label>Cliente</label>
+        <label>Cliente *</label>
         <select value={clienteId} onChange={e => setClienteId(e.target.value)}>
           <option value="">Seleccionar</option>
           {clientesMock.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
+
       <div className="form-group">
-        <label>Vehículo</label>
+        <label>Vehículo *</label>
         <select value={vehiculoId} onChange={e => setVehiculoId(e.target.value)} disabled={!clienteId}>
           <option value="">Seleccionar</option>
           {vehiculosMock.filter(v => v.cliente_id === clienteId).map(v => (
@@ -79,10 +80,22 @@ export default function NuevaOrden() {
           ))}
         </select>
       </div>
+
+      {/* 👇 NUEVO: Tipo de orden */}
+      <div className="form-group">
+        <label>Tipo de orden *</label>
+        <select value={tipo} onChange={e => setTipo(e.target.value as TipoOrden)}>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Diagnóstico de fallas">Diagnóstico de fallas</option>
+        </select>
+      </div>
+
       <div className="form-group">
         <label>Motivo de ingreso</label>
         <textarea value={motivoIngreso} onChange={e => setMotivoIngreso(e.target.value)} rows={3} />
       </div>
+
       <div className="form-actions">
         <button className="btn-cancelar" onClick={() => navigate('/ordenes')}>Cancelar</button>
         <button className="btn-guardar" onClick={handleSubmit}>Crear orden</button>

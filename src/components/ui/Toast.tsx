@@ -1,4 +1,3 @@
-// src/components/ui/Toast.tsx
 import React, { useState, useEffect } from 'react';
 import { FaCheckCircle, FaExclamationCircle, FaInfoCircle, FaTimes } from 'react-icons/fa';
 
@@ -11,23 +10,22 @@ interface ToastProps {
   onClose: () => void;
 }
 
-// Estilos más bonitos usando variables CSS y colores personalizados
-const toastStyles: Record<ToastType, { bg: string; icon: React.ReactNode }> = {
+const toastStyles: Record<ToastType, { bg: string; icon: JSX.Element }> = {
   success: { 
-    bg: 'var(--toast-success, #10b981)', 
-    icon: <FaCheckCircle className="text-white" /> 
+    bg: '#10b981', 
+    icon: <FaCheckCircle /> 
   },
   error: { 
-    bg: 'var(--toast-error, #ef4444)', 
-    icon: <FaExclamationCircle className="text-white" /> 
+    bg: '#ef4444', 
+    icon: <FaExclamationCircle /> 
   },
   warning: { 
-    bg: 'var(--toast-warning, #f59e0b)', 
-    icon: <FaExclamationCircle className="text-white" /> 
+    bg: '#f59e0b', 
+    icon: <FaExclamationCircle /> 
   },
   info: { 
-    bg: 'var(--toast-info, #3b82f6)', 
-    icon: <FaInfoCircle className="text-white" /> 
+    bg: '#3b82f6', 
+    icon: <FaInfoCircle /> 
   },
 };
 
@@ -47,12 +45,11 @@ export default function Toast({ message, type = 'info', duration = 4000, onClose
   const style = toastStyles[type];
 
   return (
-    <div 
-      className="toast-notification"
+    <div
       style={{
         position: 'fixed',
-        top: '20px',
-        right: '20px',
+        top: '24px',
+        right: '24px',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
@@ -71,14 +68,14 @@ export default function Toast({ message, type = 'info', duration = 4000, onClose
         backdropFilter: 'blur(4px)',
       }}
     >
-      <span className="toast-icon" style={{ fontSize: '1.5rem', flexShrink: 0 }}>
+      <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>
         {style.icon}
       </span>
-      <span className="toast-message" style={{ flex: 1, fontSize: '0.95rem', fontWeight: 500, lineHeight: 1.4 }}>
+      <span style={{ flex: 1, fontSize: '0.95rem', fontWeight: 500, lineHeight: 1.4 }}>
         {message}
       </span>
-      <button 
-        onClick={() => { setIsVisible(false); setTimeout(onClose, 300); }} 
+      <button
+        onClick={() => { setIsVisible(false); setTimeout(onClose, 300); }}
         style={{
           background: 'none',
           border: 'none',

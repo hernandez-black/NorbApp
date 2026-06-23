@@ -3,14 +3,17 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   FaArrowLeft, FaCar, FaStethoscope, FaFileInvoiceDollar,
   FaWrench, FaClipboardList, FaCheckCircle, FaHandshake,
-  FaCamera, FaTools, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaFileUpload
+  FaCamera, FaTools, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaFileUpload, FaFilePdf
 } from "react-icons/fa";
 import { useOrdenes } from '../../context/useOrdenes';
 import { useToast } from '../../context/useToast';
-import type { EstadoOrden, ObjetoInventario, Usuario, ItemCotizacion, Refaccion, BitacoraItem, Cotizacion, FormaPago, Diagnostico, Rol, Evidencia, Checklist, EstadoRefaccion } from "../../types";
+import type { EstadoOrden, ObjetoInventario, Usuario, ItemCotizacion, Refaccion, BitacoraItem, Cotizacion, FormaPago, Diagnostico, Rol, Evidencia, Checklist, EstadoRefaccion, TipoOrden } from "../../types";
 import UploadFoto from "../../components/ui/UpdloadFoto";
-import FirmaDigital from "../../components/ui/FirmaDigital";
 import Modal from "../../components/ui/Modal";
+import { generarPDFOrden } from '../../utils/generarPDF';
+import CartaCompromiso from '../../components/ui/cartaCompromiso';
+import { vehiculosMock } from '../../mocks/data';
+import ConfirmModal from '../../components/ui/ConfirmModal'; // ✅ Descomentado y ruta corregida
 import "../../css/Orden/DetalleOrdenes.css";
 
 // ── Tabs disponibles ──────────────────────────────────────
@@ -54,6 +57,7 @@ function ObjetosEditor({ objetos, onUpdate, ordenId }: { objetos: ObjetoInventar
     onUpdate(objetos.filter(o => o.id !== id));
     if (editandoId === id) setEditandoId(null);
   };
+  //  
 
   const startEdit = (obj: ObjetoInventario) => {
     setEditandoId(obj.id);
@@ -179,13 +183,6 @@ const estadoConfig: Record<EstadoOrden, { clase: string; label: string }> = {
   "Terminado":     { clase: "badge-terminado",     label: "Terminado" },
 };
 
-// const refEstadoConfig: Record<string, string> = {
-//   "Solicitada": "ref-solicitada",
-//   "En camino":  "ref-encamino",
-//   "Recibida":   "ref-recibida",
-//   "Instalada":  "ref-instalada",
-// };
-
 export default function DetalleOrden() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -198,10 +195,6 @@ export default function DetalleOrden() {
   const [costoDiagnostico, setCostoDiagnostico] = useState<number>(orden?.diagnostico?.costo_diagnostico || 0);
   const [responsableRecepcion, setResponsableRecepcion] = useState(orden?.responsable_recepcion || "");
   const initialLoadRef = useRef(true);
-
-  // ── Estados para firma digital ──
-  const [mostrarFirma, setMostrarFirma] = useState(false);
-  const [firmaBase64, setFirmaBase64] = useState<string | undefined>(orden?.firma_Cliente);
 
   // ── Estados para fotos por etapa ──
   const [fotosRecepcion, setFotosRecepcion] = useState<string[]>(
@@ -231,18 +224,42 @@ export default function DetalleOrden() {
     fecha_solicitud: new Date().toLocaleDateString('es-MX'),
   });
 
+  // ── Estados para checklist dinámico ──
+  const [nuevoItemChecklist, setNuevoItemChecklist] = useState({
+    seccion: 'prueba_final' as 'prueba_final' | 'entrega',
+    texto: '',
+  });
+  const [mostrarInputChecklist, setMostrarInputChecklist] = useState(false);
+
+  // ── Estado del modal de confirmación ──
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    onConfirm: () => void;
+    title?: string;
+    message?: string;
+    type?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    onConfirm: () => {},
+  });
+
   useEffect(() => {
-    if (initialLoadRef.current && orden) {
-      setCostoDiagnostico(orden.diagnostico?.costo_diagnostico || 0);
-      setResponsableRecepcion(orden.responsable_recepcion || "");
-      setFirmaBase64(orden.firma_Cliente);
-      setFotosRecepcion(orden.evidencias?.filter(e => e.tipo === 'Recepción').map(e => e.url_foto) || []);
-      setFotosDiagnostico(orden.evidencias?.filter(e => e.tipo === 'Diagnóstico').map(e => e.url_foto) || []);
-      setFotosReparacion(orden.evidencias?.filter(e => e.tipo === 'Reparación').map(e => e.url_foto) || []);
-      setFotosEntrega(orden.evidencias?.filter(e => e.tipo === 'Entrega').map(e => e.url_foto) || []);
-      initialLoadRef.current = false;
+  if (initialLoadRef.current && orden) {
+    setCostoDiagnostico(orden.diagnostico?.costo_diagnostico || 0);
+    setResponsableRecepcion(orden.responsable_recepcion || "");
+    setFotosRecepcion(orden.evidencias?.filter(e => e.tipo === 'Recepción').map(e => e.url_foto) || []);
+    setFotosDiagnostico(orden.evidencias?.filter(e => e.tipo === 'Diagnóstico').map(e => e.url_foto) || []);
+    setFotosReparacion(orden.evidencias?.filter(e => e.tipo === 'Reparación').map(e => e.url_foto) || []);
+    setFotosEntrega(orden.evidencias?.filter(e => e.tipo === 'Entrega').map(e => e.url_foto) || []);
+    
+    // 👇 NUEVO: Asignar tipo por defecto si no tiene
+    if (!orden.tipo) {
+      updateOrden(orden.id, { tipo: 'preventivo' });
     }
-  }, [orden]);
+    
+    initialLoadRef.current = false;
+  }
+}, [orden]);
 
   // Estados locales para la cotización (RF-12 a 15)
   const [itemsCotizacion, setItemsCotizacion] = useState<ItemCotizacion[]>(orden?.cotizacion?.items || []);
@@ -389,11 +406,18 @@ export default function DetalleOrden() {
     showToast("Avance registrado", "success");
   };
 
-  const handleEliminarAvance = (id: string) => {
-    if (!confirm('¿Eliminar este avance?')) return;
-    const bitacoraActualizada = orden.bitacora?.filter(b => b.id !== id) || [];
-    updateOrden(orden.id, { bitacora: bitacoraActualizada });
-    showToast("Avance eliminado", "info");
+  const handleEliminarAvance = (id: string, descripcion: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Eliminar avance',
+      message: `¿Estás seguro de eliminar el avance "${descripcion}"? Esta acción no se puede deshacer.`,
+      type: 'danger',
+      onConfirm: () => {
+        const bitacoraActualizada = orden.bitacora?.filter(b => b.id !== id) || [];
+        updateOrden(orden.id, { bitacora: bitacoraActualizada });
+        showToast('Avance eliminado', 'info');
+      },
+    });
   };
 
   const handleEditarAvance = (item: BitacoraItem) => {
@@ -547,21 +571,7 @@ export default function DetalleOrden() {
     showToast(`Foto de ${tipo} eliminada`, "info");
   };
 
-  // ── Validación de evidencias (RF-25) ──────────────────────
-  const validarEvidencias = (): boolean => {
-    const tiposRequeridos = ['Recepción', 'Diagnóstico', 'Reparación', 'Entrega'];
-    const evidencias = orden.evidencias || [];
-    for (const tipo of tiposRequeridos) {
-      const tiene = evidencias.some(e => e.tipo === tipo);
-      if (!tiene) {
-        showToast(`Falta evidencia fotográfica en la etapa: ${tipo}`, "error");
-        return false;
-      }
-    }
-    return true;
-  };
-
-  // ── Manejador de checklist interactivo ────────────────────
+  // ── Manejador de checklist fijo (los originales) ──────────
   const handleChecklistChange = (seccion: 'prueba_final' | 'entrega', campo: keyof Checklist, valor: boolean) => {
     const currentChecklist = orden.checklist || { prueba_final: {} as Checklist, entrega: {} as Checklist };
     const updatedSeccion = { ...currentChecklist[seccion], [campo]: valor };
@@ -570,14 +580,58 @@ export default function DetalleOrden() {
     showToast(`${campo} ${valor ? 'marcado' : 'desmarcado'}`, "info");
   };
 
+  // ── Manejadores de checklist dinámico ──────────────────────
+  const handleAgregarItemChecklist = () => {
+    if (!nuevoItemChecklist.texto.trim()) {
+      showToast("Escribe un nombre para el ítem", "error");
+      return;
+    }
+    const extra = orden.checklist_extra || [];
+    const nuevo = {
+      id: Date.now().toString(),
+      seccion: nuevoItemChecklist.seccion,
+      label: nuevoItemChecklist.texto.trim(),
+      checked: false,
+    };
+    updateOrden(orden.id, { checklist_extra: [...extra, nuevo] });
+    setNuevoItemChecklist({ seccion: 'prueba_final', texto: '' });
+    setMostrarInputChecklist(false);
+    showToast('Ítem agregado al checklist', 'success');
+  };
+
+  const handleEliminarItemChecklist = (id: string, label: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Eliminar ítem del checklist',
+      message: `¿Estás seguro de eliminar el ítem "${label}"? Esta acción no se puede deshacer.`,
+      type: 'danger',
+      onConfirm: () => {
+        const extra = orden.checklist_extra || [];
+        updateOrden(orden.id, { checklist_extra: extra.filter(i => i.id !== id) });
+        showToast('Ítem eliminado', 'info');
+      },
+    });
+  };
+
+  const handleToggleItemChecklist = (id: string) => {
+    const extra = orden.checklist_extra || [];
+    const updated = extra.map(i =>
+      i.id === id ? { ...i, checked: !i.checked } : i
+    );
+    updateOrden(orden.id, { checklist_extra: updated });
+  };
+
   // ── Renderizado ──────────────────────────────────────────
   return (
     <div className="detalle">
-      {/* Header */}
+      {/* Header con botón PDF */}
       <div className="detalle-header">
         <div className="detalle-header-left">
           <button className="btn-back" onClick={() => navigate("/ordenes")}>
             <FaArrowLeft /> Volver
+          </button>
+          <button className="btn-secondary btn-sm" onClick={() => generarPDFOrden(orden)} style={{ marginLeft: '0.5rem' }}>
+            <FaFilePdf /> Generar PDF
           </button>
           <div>
             <div className="detalle-titulo-row">
@@ -590,28 +644,22 @@ export default function DetalleOrden() {
           </div>
         </div>
         {rol === "admin" && (
-          <div className="detalle-header-actions">
-            <select
-              className="select-estado"
-              value={orden.estado}
-              onChange={(e) => {
-                const nuevoEstado = e.target.value as EstadoOrden;
-                if (nuevoEstado === 'Terminado' && !validarEvidencias()) {
-                  return;
-                }
-                updateOrden(orden.id, { estado: nuevoEstado });
-                if (nuevoEstado === 'Terminado') {
-                  showToast('Orden marcada como Terminada', 'success');
-                }
-              }}
-            >
-              <option value="Ingresado">Ingresado</option>
-              <option value="Diagnosticado">Diagnosticado</option>
-              <option value="Autorizado">Autorizado</option>
-              <option value="Terminado">Terminado</option>
-            </select>
-          </div>
-        )}
+  <div className="detalle-header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <select
+      className="select-estado"
+      value={orden.tipo || 'Preventivo'}
+      onChange={(e) => {
+        updateOrden(orden.id, { tipo: e.target.value as TipoOrden });
+        showToast(`Tipo de orden actualizado a ${e.target.value}`, 'success');
+      }}
+      style={{ minWidth: '140px' }}
+    >
+      <option value="Preventivo">Preventivo</option>
+      <option value="Correctivo">Correctivo</option>
+      <option value="Diagnóstico de fallas">Diagnóstico</option>
+    </select>
+  </div>
+)}
       </div>
 
       {/* Tabs */}
@@ -629,10 +677,11 @@ export default function DetalleOrden() {
 
       {/* Contenido tabs */}
       <div className="tab-contenido">
-        {/* TAB 1: RECEPCIÓN (con fotos) */}
+        {/* TAB 1: RECEPCIÓN (con fotos) - CORREGIDO: admin puede cambiar vehículo */}
         {tabActivo === "recepcion" && (
           <div className="tab-panel">
             <div className="panel-grid-2">
+              {/* Datos del Cliente (sin cambios) */}
               <div className="panel-card">
                 <h3 className="panel-card-title">Datos del Cliente</h3>
                 <div className="info-list">
@@ -642,17 +691,46 @@ export default function DetalleOrden() {
                   <div className="info-item"><span>Tipo</span><p>{orden.cliente?.tipo || "—"}</p></div>
                 </div>
               </div>
+
+              {/* ─── DATOS DEL VEHÍCULO (EDITABLE PARA ADMIN) ─── */}
               <div className="panel-card">
                 <h3 className="panel-card-title">Datos del Vehículo</h3>
-                <div className="info-list">
-                  <div className="info-item"><span>Marca / Modelo</span><p>{orden.vehiculo?.marca} {orden.vehiculo?.modelo}</p></div>
-                  <div className="info-item"><span>Año / Color</span><p>{orden.vehiculo?.anio} / {orden.vehiculo?.color}</p></div>
-                  <div className="info-item"><span>Placas</span><p className="mono">{orden.vehiculo?.placas}</p></div>
-                  <div className="info-item"><span>Kilometraje</span><p>{orden.vehiculo?.kilometraje?.toLocaleString()} km</p></div>
-                  <div className="info-item"><span>VIN</span><p className="mono">{orden.vehiculo?.vin || "—"}</p></div>
-                  <div className="info-item"><span>Motor / Cilindros</span><p>{orden.vehiculo?.motor} / {orden.vehiculo?.cilindraje}</p></div>
-                </div>
+                {rol === "admin" ? (
+                  <select
+                    value={orden.vehiculo_id || ""}
+                    onChange={(e) => {
+                      const nuevoVehiculo = vehiculosMock.find(v => v.id === e.target.value);
+                      if (nuevoVehiculo) {
+                        updateOrden(orden.id, {
+                          vehiculo_id: nuevoVehiculo.id,
+                          vehiculo: nuevoVehiculo,
+                        });
+                        showToast('Vehículo actualizado correctamente', 'success');
+                      }
+                    }}
+                    className="form-select"
+                  >
+                    {vehiculosMock
+                      .filter(v => v.cliente_id === orden.cliente_id)
+                      .map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.marca} {v.modelo} - {v.placas} ({v.anio})
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <div className="info-list">
+                    <div className="info-item"><span>Marca / Modelo</span><p>{orden.vehiculo?.marca} {orden.vehiculo?.modelo}</p></div>
+                    <div className="info-item"><span>Año / Color</span><p>{orden.vehiculo?.anio} / {orden.vehiculo?.color}</p></div>
+                    <div className="info-item"><span>Placas</span><p className="mono">{orden.vehiculo?.placas}</p></div>
+                    <div className="info-item"><span>Kilometraje</span><p>{orden.vehiculo?.kilometraje?.toLocaleString()} km</p></div>
+                    <div className="info-item"><span>VIN</span><p className="mono">{orden.vehiculo?.vin || "—"}</p></div>
+                    <div className="info-item"><span>Motor / Cilindros</span><p>{orden.vehiculo?.motor} / {orden.vehiculo?.cilindraje}</p></div>
+                  </div>
+                )}
               </div>
+
+              {/* Motivo de Ingreso (sin cambios) */}
               <div className="panel-card">
                 <h3 className="panel-card-title">Motivo de Ingreso</h3>
                 <p className="panel-texto">{orden.motivo_ingreso || "—"}</p>
@@ -670,11 +748,15 @@ export default function DetalleOrden() {
                   </select>
                 </div>
               </div>
+
+              {/* Inventario de Objetos (sin cambios) */}
               <div className="panel-card">
                 <h3 className="panel-card-title">Inventario de Objetos</h3>
                 <ObjetosEditor objetos={orden.objetos || []} onUpdate={handleUpdateObjetos} ordenId={orden.id} />
               </div>
             </div>
+
+            {/* Fotografías de Recepción (sin cambios) */}
             <div className="panel-card mt-1">
               <h3 className="panel-card-title"><FaCamera /> Fotografías de Recepción</h3>
               <div className="flex flex-wrap gap-2">
@@ -706,7 +788,7 @@ export default function DetalleOrden() {
           </div>
         )}
 
-        {/* TAB 2: DIAGNÓSTICO (con fotos) - CORREGIDO: usa fotosDiagnostico */}
+        {/* TAB 2: DIAGNÓSTICO (con fotos) - sin cambios */}
         {tabActivo === "diagnostico" && (
           <div className="tab-panel">
             <div className="panel-grid-2">
@@ -817,7 +899,7 @@ export default function DetalleOrden() {
           </div>
         )}
 
-        {/* TAB 3: COTIZACIÓN */}
+        {/* TAB 3: COTIZACIÓN - sin cambios */}
         {tabActivo === "cotizacion" && (
           <div className="tab-panel">
             <div className="panel-card">
@@ -869,19 +951,19 @@ export default function DetalleOrden() {
                   </select>
                 </div>
                 <div className="form-group">
-  <label className="form-label">Evidencia (captura o audio)</label>
-  <label htmlFor="evidencia-input" className="btn-evidencia">
-    <FaFileUpload /> {evidenciaFile ? "Cambiar archivo" : "Seleccionar archivo"}
-  </label>
-  <input
-    id="evidencia-input"
-    type="file"
-    accept="image/*,audio/*"
-    onChange={e => setEvidenciaFile(e.target.files?.[0] || null)}
-    className="input-file-hidden"
-  />
-  {evidenciaFile && <p className="text-muted-sm mt-1">📎 {evidenciaFile.name}</p>}
-</div>
+                  <label className="form-label">Evidencia (captura o audio)</label>
+                  <label htmlFor="evidencia-input" className="btn-evidencia">
+                    <FaFileUpload /> {evidenciaFile ? "Cambiar archivo" : "Seleccionar archivo"}
+                  </label>
+                  <input
+                    id="evidencia-input"
+                    type="file"
+                    accept="image/*,audio/*"
+                    onChange={e => setEvidenciaFile(e.target.files?.[0] || null)}
+                    className="input-file-hidden"
+                  />
+                  {evidenciaFile && <p className="text-muted-sm mt-1">📎 {evidenciaFile.name}</p>}
+                </div>
                 <button className="btn-primary" onClick={guardarAutorizacion}>Guardar autorización</button>
               </div>
 
@@ -913,7 +995,7 @@ export default function DetalleOrden() {
           </div>
         )}
 
-        {/* TAB 4: REFACCIONES (con fotos, cambio de estado y agregar) */}
+        {/* TAB 4: REFACCIONES (con fotos, cambio de estado y agregar) - sin cambios */}
         {tabActivo === "refacciones" && (
           <div className="tab-panel">
             <div className="panel-card">
@@ -962,55 +1044,55 @@ export default function DetalleOrden() {
                         <td className="text-muted-sm">{r.fecha_estimada || "—"}</td>
                         <td className="text-muted-sm">{r.fecha_recepcion || "—"}</td>
                         <td>
-  {r.foto_recibida ? (
-    <div className="foto-wrapper">
-      <img
-        src={r.foto_recibida}
-        alt="Recibida"
-        className="foto-thumbnail-sm"
-        onClick={() => setFotoSeleccionada(r.foto_recibida!)}
-      />
-      <button
-        className="btn-eliminar-foto-sm"
-        onClick={() => handleEliminarFotoRefaccion(r.id, 'recibida')}
-      >
-        ×
-      </button>
-    </div>
-  ) : (
-    <UploadFoto
-      onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'recibida', file, preview)}
-      label="Subir"
-      className="inline-block"
-      buttonClassName="upload-btn-compact"
-    />
-  )}
-</td>
+                          {r.foto_recibida ? (
+                            <div className="foto-wrapper">
+                              <img
+                                src={r.foto_recibida}
+                                alt="Recibida"
+                                className="foto-thumbnail-sm"
+                                onClick={() => setFotoSeleccionada(r.foto_recibida!)}
+                              />
+                              <button
+                                className="btn-eliminar-foto-sm"
+                                onClick={() => handleEliminarFotoRefaccion(r.id, 'recibida')}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <UploadFoto
+                              onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'recibida', file, preview)}
+                              label="Subir"
+                              className="inline-block"
+                              buttonClassName="upload-btn-compact"
+                            />
+                          )}
+                        </td>
                         <td>
-  {r.foto_instalada ? (
-    <div className="foto-wrapper">
-      <img
-        src={r.foto_instalada}
-        alt="Instalada"
-        className="foto-thumbnail-sm"
-        onClick={() => setFotoSeleccionada(r.foto_instalada!)}
-      />
-      <button
-        className="btn-eliminar-foto-sm"
-        onClick={() => handleEliminarFotoRefaccion(r.id, 'instalada')}
-      >
-        ×
-      </button>
-    </div>
-  ) : (
-    <UploadFoto
-      onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'instalada', file, preview)}
-      label="Subir"
-      className="inline-block"
-      buttonClassName="upload-btn-compact"
-    />
-  )}
-</td>
+                          {r.foto_instalada ? (
+                            <div className="foto-wrapper">
+                              <img
+                                src={r.foto_instalada}
+                                alt="Instalada"
+                                className="foto-thumbnail-sm"
+                                onClick={() => setFotoSeleccionada(r.foto_instalada!)}
+                              />
+                              <button
+                                className="btn-eliminar-foto-sm"
+                                onClick={() => handleEliminarFotoRefaccion(r.id, 'instalada')}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <UploadFoto
+                              onUpload={(file, preview) => handleSubirFotoRefaccion(r.id, 'instalada', file, preview)}
+                              label="Subir"
+                              className="inline-block"
+                              buttonClassName="upload-btn-compact"
+                            />
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1020,7 +1102,7 @@ export default function DetalleOrden() {
           </div>
         )}
 
-        {/* Modal para agregar refacción */}
+        {/* Modal para agregar refacción - sin cambios */}
         <Modal isOpen={mostrarModalRefaccion} onClose={() => setMostrarModalRefaccion(false)} title="Agregar refacción">
           <div className="form-group">
             <label className="form-label">Nombre *</label>
@@ -1050,7 +1132,7 @@ export default function DetalleOrden() {
           </div>
         </Modal>
 
-        {/* TAB 5: REPARACIÓN (con Bitácora y Mecánicos - RF-23 y RF-21) */}
+        {/* TAB 5: REPARACIÓN (con Bitácora y Mecánicos) - con modal para eliminar avance */}
         {tabActivo === "reparacion" && (
           <div className="tab-panel">
             {/* Panel de Bitácora */}
@@ -1094,7 +1176,7 @@ export default function DetalleOrden() {
                       </div>
                       <div className="bitacora-acciones">
                         <button className="btn-icon btn-edit" onClick={() => handleEditarAvance(b)} title="Editar avance"><FaEdit /></button>
-                        <button className="btn-icon btn-danger" onClick={() => handleEliminarAvance(b.id)} title="Eliminar avance"><FaTrash /></button>
+                        <button className="btn-icon btn-danger" onClick={() => handleEliminarAvance(b.id, b.descripcion)} title="Eliminar avance"><FaTrash /></button>
                       </div>
                     </div>
                   ))
@@ -1167,7 +1249,7 @@ export default function DetalleOrden() {
           </div>
         )}
 
-        {/* Modal para editar avance */}
+        {/* Modal para editar avance - sin cambios */}
         {avanceEditando && (
           <div className="modal-overlay" onClick={() => setAvanceEditando(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ background: 'var(--fondo-card)', padding: '2rem', borderRadius: '12px', maxWidth: '500px', width: '90%' }}>
@@ -1186,13 +1268,43 @@ export default function DetalleOrden() {
           </div>
         )}
 
-        {/* TAB 6: CHECKLIST (interactivo) */}
+        {/* TAB 6: CHECKLIST (interactivo + dinámico con modal para eliminar) */}
         {tabActivo === "checklist" && (
           <div className="tab-panel">
             <div className="panel-grid-2">
+              {/* ─── PRUEBA FINAL ─── */}
               <div className="panel-card">
-                <h3 className="panel-card-title">Prueba Final</h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="panel-card-title">Prueba Final</h3>
+                  <button
+                    className="btn-success btn-sm"
+                    onClick={() => {
+                      setNuevoItemChecklist({ seccion: 'prueba_final', texto: '' });
+                      setMostrarInputChecklist(!mostrarInputChecklist);
+                    }}
+                  >
+                    {mostrarInputChecklist && nuevoItemChecklist.seccion === 'prueba_final' ? 'Cancelar' : '+ Agregar ítem'}
+                  </button>
+                </div>
+
+                {mostrarInputChecklist && nuevoItemChecklist.seccion === 'prueba_final' && (
+                  <div className="flex gap-2 mt-2 items-center flex-wrap">
+                    <input
+                      type="text"
+                      placeholder="Nuevo ítem..."
+                      value={nuevoItemChecklist.texto}
+                      onChange={(e) => setNuevoItemChecklist({ ...nuevoItemChecklist, texto: e.target.value })}
+                      className="form-input flex-1"
+                      style={{ minWidth: '150px' }}
+                    />
+                    <button className="btn-primary btn-sm" onClick={handleAgregarItemChecklist}>
+                      Agregar
+                    </button>
+                  </div>
+                )}
+
                 <div className="checklist-lista">
+                  {/* Ítems fijos */}
                   {[
                     { label: "Sin daños nuevos", key: "sin_danos" },
                     { label: "Piezas instaladas OK", key: "piezas_ok" },
@@ -1209,11 +1321,64 @@ export default function DetalleOrden() {
                       </label>
                     </div>
                   ))}
+                  {/* Ítems extra (dinámicos) */}
+                  {(orden.checklist_extra || [])
+                    .filter(item => item.seccion === 'prueba_final')
+                    .map(item => (
+                      <div key={item.id} className="check-item">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.checked}
+                            onChange={() => handleToggleItemChecklist(item.id)}
+                          />
+                          <span>{item.label}</span>
+                          <button
+                            onClick={() => handleEliminarItemChecklist(item.id, item.label)}
+                            className="text-red-400 hover:text-red-600 transition-colors ml-2"
+                            title="Eliminar ítem"
+                          >
+                            <FaTrash className="w-4 h-4" />
+                          </button>
+                        </label>
+                      </div>
+                    ))}
                 </div>
               </div>
+
+              {/* ─── CHECKLIST DE ENTREGA ─── */}
               <div className="panel-card">
-                <h3 className="panel-card-title">Checklist de Entrega</h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="panel-card-title">Checklist de Entrega</h3>
+                  <button
+                    className="btn-success btn-sm"
+                    onClick={() => {
+                      setNuevoItemChecklist({ seccion: 'entrega', texto: '' });
+                      setMostrarInputChecklist(!mostrarInputChecklist);
+                    }}
+                  >
+                    {mostrarInputChecklist && nuevoItemChecklist.seccion === 'entrega' ? 'Cancelar' : '+ Agregar ítem'}
+                  </button>
+                </div>
+
+                {mostrarInputChecklist && nuevoItemChecklist.seccion === 'entrega' && (
+                  <div className="flex gap-2 mt-2 items-center flex-wrap">
+                    <input
+                      type="text"
+                      placeholder="Nuevo ítem..."
+                      value={nuevoItemChecklist.texto}
+                      onChange={(e) => setNuevoItemChecklist({ ...nuevoItemChecklist, texto: e.target.value })}
+                      className="form-input flex-1"
+                      style={{ minWidth: '150px' }}
+                    />
+                    <button className="btn-primary btn-sm" onClick={handleAgregarItemChecklist}>
+                      Agregar
+                    </button>
+                  </div>
+                )}
+
                 <div className="checklist-lista">
+                  {/* Ítems fijos */}
                   {[
                     { label: "Vehículo limpio", key: "limpieza" },
                     { label: "Sin daños en la entrega", key: "sin_danos" },
@@ -1230,13 +1395,35 @@ export default function DetalleOrden() {
                       </label>
                     </div>
                   ))}
+                  {/* Ítems extra (dinámicos) */}
+                  {(orden.checklist_extra || [])
+                    .filter(item => item.seccion === 'entrega')
+                    .map(item => (
+                      <div key={item.id} className="check-item">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.checked}
+                            onChange={() => handleToggleItemChecklist(item.id)}
+                          />
+                          <span>{item.label}</span>
+                          <button
+                            onClick={() => handleEliminarItemChecklist(item.id, item.label)}
+                            className="text-red-400 hover:text-red-600 transition-colors ml-2"
+                            title="Eliminar ítem"
+                          >
+                            <FaTrash className="w-4 h-4" />
+                          </button>
+                        </label>
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 7: ENTREGA (con firma y fotos) - CORREGIDO: usa fotosEntrega */}
+        {/* TAB 7: ENTREGA (con Carta Compromiso y fotos) */}
         {tabActivo === "entrega" && (
           <div className="tab-panel">
             <div className="panel-grid-2">
@@ -1265,27 +1452,17 @@ export default function DetalleOrden() {
                   </>
                 )}
               </div>
-              <div className="panel-card">
-                <h3 className="panel-card-title">Firma del Cliente (RF-26)</h3>
-                {firmaBase64 ? (
-                  <div>
-                    <img src={firmaBase64} alt="Firma del cliente" className="max-w-full h-auto border rounded" />
-                    <button className="btn-danger mt-2" onClick={() => { setFirmaBase64(undefined); updateOrden(orden.id, { firma_Cliente: undefined }); showToast("Firma eliminada", "info"); }}>Eliminar firma</button>
-                  </div>
-                ) : mostrarFirma ? (
-                  <FirmaDigital
-                    onSave={(firma) => {
-                      setFirmaBase64(firma);
-                      updateOrden(orden.id, { firma_Cliente: firma });
-                      setMostrarFirma(false);
-                      showToast('Firma guardada', 'success');
-                    }}
-                    onCancel={() => setMostrarFirma(false)}
-                  />
-                ) : (
-                  <button className="btn-primary" onClick={() => setMostrarFirma(true)}>Capturar firma</button>
-                )}
-              </div>
+
+              {/* Carta Compromiso */}
+              <CartaCompromiso
+                orden={orden}
+                onFirmar={(nombre) => {
+                  updateOrden(orden.id, { firma_Cliente: nombre });
+                  showToast('Carta compromiso firmada', 'success');
+                }}
+                firmado={!!orden.firma_Cliente}
+                nombreFirmado={orden.firma_Cliente}
+              />
             </div>
             <div className="panel-card mt-1">
               <h3 className="panel-card-title"><FaCamera /> Fotografías de Entrega</h3>
@@ -1326,7 +1503,17 @@ export default function DetalleOrden() {
         )}
       </Modal>
 
-      {/* Toasts */}
+      {/* ─── MODAL DE CONFIRMACIÓN ─── */}
+      <ConfirmModal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type || 'danger'}
+      />
+
+      {/* ─── TOASTS ─── */}
       {toasts.map((toast) => (
         <div key={toast.id} className="fixed top-4 right-4 z-50">
           <div className={`px-4 py-3 rounded-lg shadow-lg text-white ${
