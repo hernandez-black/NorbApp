@@ -23,6 +23,7 @@
   font-size: 1rem;
   padding: 0.8rem 1.2rem;
   border-radius: 9999px;
+  touch-action: manipulation; /* nuevo */
 }
 
 .navbar-brand:hover {
